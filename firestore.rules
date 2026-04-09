@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: staff
+    // Fields:
+    //   - name: string (required)
+    //   - email: string (required, email format)
+    //   - role: string (required, ['admin', 'staff'])
+    //   - color: string (optional)
+    //
+    // Collection: shifts
+    // Fields:
+    //   - staffId: string (required)
+    //   - staffName: string (optional)
+    //   - startTime: timestamp (required)
+    //   - endTime: timestamp (required)
+    //   - title: string (optional)
+    //   - note: string (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "bigmac0901@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidStaff(data) {
+      return data.keys().hasAll(['name', 'role']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             (!('email' in data) || isValidEmail(data.email)) &&
+             data.role in ['admin', 'staff'] &&
+             (!('color' in data) || (data.color is string && data.color.size() < 20)) &&
+             (!('isManual' in data) || data.isManual is bool) &&
+             (!('loginId' in data) || (data.loginId is string && data.loginId.size() < 50));
+    }
+
+    function isValidShift(data) {
+      return data.keys().hasAll(['staffId', 'startTime', 'endTime']) &&
+             data.staffId is string &&
+             data.startTime is timestamp &&
+             data.endTime is timestamp &&
+             data.endTime > data.startTime &&
+             (!('title' in data) || (data.title is string && data.title.size() < 200)) &&
+             (!('note' in data) || (data.note is string && data.note.size() < 1000));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /staff/{staffId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidStaff(request.resource.data) && (request.auth.uid == staffId || isAdmin());
+      allow update: if isAuthenticated() && isValidStaff(request.resource.data) && (request.auth.uid == staffId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /shifts/{shiftId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidShift(request.resource.data) && (request.resource.data.staffId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && isValidShift(request.resource.data) && (resource.data.staffId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.staffId == request.auth.uid || isAdmin());
+    }
+  }
+}

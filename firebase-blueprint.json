@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "staff": {
+      "title": "Staff",
+      "description": "スタッフ情報",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "名前" },
+        "loginId": { "type": "string", "description": "ログインID（手動追加用）" },
+        "email": { "type": "string", "format": "email", "description": "メールアドレス（Googleログイン用）" },
+        "role": { "type": "string", "enum": ["admin", "staff"], "description": "役割" },
+        "color": { "type": "string", "description": "カレンダー表示色" },
+        "isManual": { "type": "boolean", "description": "手動で追加されたスタッフかどうか" }
+      },
+      "required": ["name", "role"]
+    },
+    "shift": {
+      "title": "Shift",
+      "description": "シフト・スケジュール情報",
+      "type": "object",
+      "properties": {
+        "staffId": { "type": "string", "description": "スタッフID" },
+        "staffName": { "type": "string", "description": "スタッフ名" },
+        "startTime": { "type": "string", "format": "date-time", "description": "開始時間" },
+        "endTime": { "type": "string", "format": "date-time", "description": "終了時間" },
+        "title": { "type": "string", "description": "予定タイトル" },
+        "note": { "type": "string", "description": "備考" }
+      },
+      "required": ["staffId", "startTime", "endTime"]
+    }
+  },
+  "firestore": {
+    "/staff/{staffId}": {
+      "schema": "staff",
+      "description": "スタッフ一覧"
+    },
+    "/shifts/{shiftId}": {
+      "schema": "shift",
+      "description": "シフト一覧"
+    }
+  }
+}
