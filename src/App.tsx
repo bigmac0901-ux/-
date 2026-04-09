@@ -423,7 +423,7 @@ export default function App() {
                         <p className="text-xs font-semibold truncate">{staff.name}</p>
                         <p className="text-[9px] text-slate-400 uppercase font-bold">{staff.role}</p>
                       </div>
-                      {staff.id !== user.uid && (
+                      {staff.id !== user?.uid && (
                         <button 
                           onClick={() => setStaffToDelete(staff)}
                           className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 transition-all"
@@ -735,17 +735,17 @@ export default function App() {
                                   console.error("Role update error:", err);
                                 }
                               }}
-                              disabled={staff.id === user.uid}
+                              disabled={staff.id === user?.uid}
                               className={cn(
                                 "px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider outline-none cursor-pointer transition-all",
                                 staff.role === 'admin' ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600",
-                                staff.id === user.uid && "opacity-50 cursor-not-allowed"
+                                staff.id === user?.uid && "opacity-50 cursor-not-allowed"
                               )}
                             >
                               <option value="staff">Staff</option>
                               <option value="admin">Admin</option>
                             </select>
-                            {staff.id !== user.uid && (
+                            {staff.id !== user?.uid && (
                               <button 
                                 onClick={() => setStaffToDelete(staff)}
                                 className="p-2 text-slate-300 hover:text-red-500 transition-all"
