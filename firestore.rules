@@ -66,14 +66,14 @@ service cloud.firestore {
     // ===============================================================
 
     match /staff/{staffId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create: if isAuthenticated() && isValidStaff(request.resource.data) && (request.auth.uid == staffId || isAdmin());
       allow update: if isAuthenticated() && isValidStaff(request.resource.data) && (request.auth.uid == staffId || isAdmin());
       allow delete: if isAdmin();
     }
 
     match /shifts/{shiftId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create: if isAuthenticated() && isValidShift(request.resource.data) && (request.resource.data.staffId == request.auth.uid || isAdmin());
       allow update: if isAuthenticated() && isValidShift(request.resource.data) && (resource.data.staffId == request.auth.uid || isAdmin());
       allow delete: if isAuthenticated() && (resource.data.staffId == request.auth.uid || isAdmin());

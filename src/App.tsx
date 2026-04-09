@@ -206,7 +206,7 @@ export default function App() {
 
   // Data Listeners
   useEffect(() => {
-    if (!user || !isAuthReady) return;
+    if (!isAuthReady) return;
 
     const staffQuery = query(collection(db, 'staff'));
     const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
@@ -336,31 +336,6 @@ export default function App() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full glass-panel p-10 rounded-3xl text-center"
-        >
-          <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg shadow-blue-200">
-            <CalendarIcon className="w-10 h-10 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">StaffSync</h1>
-          <p className="text-slate-500 mb-10">スタッフのスケジュール管理をスマートに。</p>
-          <button 
-            onClick={handleLogin}
-            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-slate-800 transition-all active:scale-95 shadow-xl shadow-slate-200"
-          >
-            <img src="https://www.gstatic.com/firebase/explore/images/google-logo.svg" className="w-5 h-5 bg-white p-0.5 rounded-full" alt="Google" />
-            Googleでログイン
-          </button>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <ErrorBoundary>
       <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50">
@@ -486,25 +461,35 @@ export default function App() {
           </div>
 
           <div className="pt-4 border-t border-slate-100">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
-                {user.photoURL ? (
-                  <img src={user.photoURL} alt={user.displayName || ''} referrerPolicy="no-referrer" />
-                ) : (
-                  <UserIcon className="w-4 h-4 text-slate-400" />
-                )}
+            {user ? (
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt={user.displayName || ''} referrerPolicy="no-referrer" />
+                  ) : (
+                    <UserIcon className="w-4 h-4 text-slate-400" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold truncate">{user.displayName}</p>
+                  <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold truncate">{user.displayName}</p>
-                <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
-              </div>
+            ) : (
               <button 
-                onClick={handleLogout}
-                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                onClick={handleLogin}
+                className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-all active:scale-95 text-sm"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-4 h-4 rotate-180" />
+                ログイン
               </button>
-            </div>
+            )}
           </div>
         </aside>
 
