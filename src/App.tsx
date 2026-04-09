@@ -66,6 +66,12 @@ import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+// --- Constants ---
+const ADMIN_EMAILS = [
+  "bigmac0901@gmail.com",
+  // ここに管理者にしたいメールアドレスを追加してください
+];
+
 // --- Utilities ---
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -191,11 +197,11 @@ export default function App() {
         const staffDocRef = doc(db, 'staff', currentUser.uid);
         const staffDoc = await getDoc(staffDocRef);
         if (!staffDoc.exists()) {
-          const isFirstUser = currentUser.email === "bigmac0901@gmail.com";
+          const isDefaultAdmin = currentUser.email && ADMIN_EMAILS.includes(currentUser.email);
           await setDoc(staffDocRef, {
             name: currentUser.displayName || '不明なユーザー',
             email: currentUser.email,
-            role: isFirstUser ? 'admin' : 'staff',
+            role: isDefaultAdmin ? 'admin' : 'staff',
             color: '#3b82f6'
           });
         }
@@ -246,7 +252,11 @@ export default function App() {
   const handleLogout = () => signOut(auth);
 
   const currentUserData = useMemo(() => staffList.find(s => s.id === user?.uid), [staffList, user]);
-  const isAdmin = currentUserData?.role === 'admin';
+  const isAdmin = useMemo(() => {
+    if (!user) return false;
+    if (currentUserData?.role === 'admin') return true;
+    return user.email && ADMIN_EMAILS.includes(user.email);
+  }, [user, currentUserData]);
 
   // Calendar Logic
   const days = useMemo(() => {
@@ -702,7 +712,7 @@ export default function App() {
                       </button>
                     </div>
                     <div className="space-y-3">
-                      {staffList.filter(s => s.role !== 'admin').map(staff => (
+                      {staffList.map(staff => (
                         <div key={staff.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl group">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold" style={{ backgroundColor: staff.color }}>
@@ -714,12 +724,26 @@ export default function App() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className={cn(
-                              "px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider",
-                              staff.role === 'admin' ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"
-                            )}>
-                              {staff.role}
-                            </span>
+                            <select
+                              value={staff.role}
+                              onChange={async (e) => {
+                                const newRole = e.target.value as 'admin' | 'staff';
+                                try {
+                                  await updateDoc(doc(db, 'staff', staff.id), { role: newRole });
+                                } catch (err) {
+                                  console.error("Role update error:", err);
+                                }
+                              }}
+                              disabled={staff.id === user.uid}
+                              className={cn(
+                                "px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider outline-none cursor-pointer transition-all",
+                                staff.role === 'admin' ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600",
+                                staff.id === user.uid && "opacity-50 cursor-not-allowed"
+                              )}
+                            >
+                              <option value="staff">Staff</option>
+                              <option value="admin">Admin</option>
+                            </select>
                             {staff.id !== user.uid && (
                               <button 
                                 onClick={() => setStaffToDelete(staff)}
