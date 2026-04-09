@@ -212,8 +212,6 @@ export default function App() {
 
   // Data Listeners
   useEffect(() => {
-    if (!isAuthReady) return;
-
     const staffQuery = query(collection(db, 'staff'));
     const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
       const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
@@ -238,7 +236,7 @@ export default function App() {
       unsubscribeStaff();
       unsubscribeShifts();
     };
-  }, [user, isAuthReady]);
+  }, []);
 
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
@@ -333,18 +331,6 @@ export default function App() {
       console.error("Staff delete error:", err);
     }
   };
-
-  if (!isAuthReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <motion.div 
-          animate={{ rotate: 360 }}
-          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-          className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full"
-        />
-      </div>
-    );
-  }
 
   return (
     <ErrorBoundary>
@@ -471,34 +457,49 @@ export default function App() {
           </div>
 
           <div className="pt-4 border-t border-slate-100">
-            {user ? (
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
-                  {user.photoURL ? (
-                    <img src={user.photoURL} alt={user.displayName || ''} referrerPolicy="no-referrer" />
-                  ) : (
-                    <UserIcon className="w-4 h-4 text-slate-400" />
-                  )}
+            {isAuthReady ? (
+              user ? (
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
+                    {user.photoURL ? (
+                      <img src={user.photoURL} alt={user.displayName || ''} referrerPolicy="no-referrer" />
+                    ) : (
+                      <UserIcon className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold truncate">{user.displayName}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
+                  </div>
+                  <button 
+                    onClick={handleLogout}
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold truncate">{user.displayName}</p>
-                  <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">現在の状態</p>
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <Eye className="w-3.5 h-3.5" />
+                      <span className="text-xs font-bold">ゲスト閲覧中</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleLogin}
+                    className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-all active:scale-95 text-sm"
+                  >
+                    <LogOut className="w-4 h-4 rotate-180" />
+                    管理者・スタッフ ログイン
+                  </button>
                 </div>
-                <button 
-                  onClick={handleLogout}
-                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
+              )
             ) : (
-              <button 
-                onClick={handleLogin}
-                className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-all active:scale-95 text-sm"
-              >
-                <LogOut className="w-4 h-4 rotate-180" />
-                ログイン
-              </button>
+              <div className="flex items-center justify-center py-4">
+                <div className="w-5 h-5 border-2 border-slate-200 border-t-slate-400 rounded-full animate-spin" />
+              </div>
             )}
           </div>
         </aside>
