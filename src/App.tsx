@@ -69,6 +69,7 @@ import { twMerge } from 'tailwind-merge';
 // --- Constants ---
 const ADMIN_EMAILS = [
   "bigmac0901@gmail.com",
+  "alphastaff5123@gmail.com",
   // ここに管理者にしたいメールアドレスを追加してください
 ];
 
@@ -182,6 +183,7 @@ export default function App() {
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeView, setActiveView] = useState<'calendar' | 'management'>('calendar');
+  const now = new Date();
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [pendingDrop, setPendingDrop] = useState<{ shiftId: string; targetDate: Date } | null>(null);
   const [shiftToDelete, setShiftToDelete] = useState<Shift | null>(null);
@@ -628,6 +630,7 @@ export default function App() {
                             <div className="flex flex-col gap-0.5 sm:gap-1 overflow-y-auto flex-1 scrollbar-hide">
                               {dayShifts.map(shift => {
                                 const staff = staffList.find(s => s.id === shift.staffId);
+                                const isPast = shift.endTime.getTime() < now.getTime();
                                 return (
                                   <motion.button
                                     layout
@@ -656,11 +659,13 @@ export default function App() {
                                     }}
                                     className={cn(
                                       "text-left px-1 py-0.5 sm:px-1.5 sm:py-1 rounded-md sm:rounded-lg text-[7px] sm:text-[9px] font-bold truncate transition-all flex items-center gap-0.5 sm:gap-1 select-none z-10 shadow-sm group/shift",
-                                      isAdmin ? "cursor-grab active:cursor-grabbing hover:brightness-95 active:scale-95" : "cursor-default"
+                                      isAdmin ? "cursor-grab active:cursor-grabbing hover:brightness-95 active:scale-95" : "cursor-default",
+                                      isPast && "shadow-none border-transparent"
                                     )}
                                     style={{ 
                                       backgroundColor: staff?.color || '#3b82f6',
                                       color: '#fff',
+                                      opacity: isPast ? 0.3 : 1
                                     }}
                                   >
                                     {isAdmin && <GripVertical className="w-2 h-2 sm:w-2.5 sm:h-2.5 opacity-50 shrink-0" />}
@@ -875,10 +880,10 @@ export default function App() {
                       <select 
                         name="staffId" 
                         required 
-                        defaultValue={editingShift?.staffId || user.uid}
+                        defaultValue={editingShift?.staffId || user?.uid}
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                       >
-                        {staffList.map(s => (
+                        {staffList.filter(s => s.role !== 'admin').map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </select>
