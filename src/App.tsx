@@ -26,7 +26,8 @@ import {
   orderBy, 
   Timestamp,
   setDoc,
-  getDoc
+  getDoc,
+  getDocs
 } from 'firebase/firestore';
 import { 
   format, 
@@ -60,11 +61,15 @@ import {
   GripVertical,
   MoreVertical,
   Settings,
-  Eye
+  Eye,
+  RefreshCw,
+  Trophy,
+  Music
 } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { fetchSportsSchedules, type ExternalEvent } from './services/geminiService';
 
 // --- Constants ---
 const ADMIN_EMAILS = [
@@ -131,6 +136,7 @@ interface Shift {
   startTime: Date;
   endTime: Date;
   title: string;
+  event: string;
   note: string;
 }
 
@@ -177,8 +183,12 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [externalEvents, setExternalEvents] = useState<ExternalEvent[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const selectedDateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -234,11 +244,83 @@ export default function App() {
       setShifts(list);
     }, (error) => console.error("Shifts fetch error:", error));
 
+    const externalEventsQuery = query(collection(db, 'external_events'), orderBy('date', 'asc'));
+    const unsubscribeExternalEvents = onSnapshot(externalEventsQuery, (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalEvent));
+      setExternalEvents(list);
+    }, (error) => console.error("External events fetch error:", error));
+
     return () => {
       unsubscribeStaff();
       unsubscribeShifts();
+      unsubscribeExternalEvents();
     };
   }, []);
+
+  const handleSyncSchedules = async () => {
+    if (!isAdmin || isSyncing) return;
+    setIsSyncing(true);
+    setSyncMessage(null);
+    try {
+      const events = await fetchSportsSchedules();
+      if (events.length > 0) {
+        // 1. 取得したデータの重複排除
+        const uniqueEvents: ExternalEvent[] = [];
+        const seenKeys = new Set<string>();
+        
+        for (const event of events) {
+          // 日付の形式を正規化 (YYYY-MM-DD)
+          let normalizedDate = event.date.replace(/\//g, '-');
+          const dateParts = normalizedDate.split('-');
+          if (dateParts.length === 3) {
+            const year = dateParts[0];
+            const month = dateParts[1].padStart(2, '0');
+            const day = dateParts[2].padStart(2, '0');
+            normalizedDate = `${year}-${month}-${day}`;
+          }
+
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) continue;
+          
+          // スポーツは同日1試合、ライブはタイトルで重複判定
+          const dedupeKey = event.type === 'live' 
+            ? `${event.type}_${normalizedDate}_${event.title.substring(0, 10)}`
+            : `${event.type}_${normalizedDate}`;
+            
+          if (!seenKeys.has(dedupeKey)) {
+            seenKeys.add(dedupeKey);
+            uniqueEvents.push({ ...event, date: normalizedDate });
+          }
+        }
+
+        // 2. 既存のイベントをすべて削除（古いデータや名前が変わったデータの重複を防ぐため）
+        const existingEventsSnapshot = await getDocs(collection(db, 'external_events'));
+        const deletePromises = existingEventsSnapshot.docs.map(d => deleteDoc(d.ref));
+        await Promise.all(deletePromises);
+
+        // 3. 新しいイベントを保存
+        let count = 0;
+        for (const event of uniqueEvents) {
+          const eventId = `${event.type}_${event.date}_${count}`;
+          await setDoc(doc(db, 'external_events', eventId), {
+            ...event,
+            updatedAt: Timestamp.now()
+          });
+          count++;
+        }
+        setSyncMessage({ text: `${count}件のイベント情報を同期しました。`, type: 'success' });
+      } else {
+        setSyncMessage({ text: 'イベント情報が見つかりませんでした。', type: 'error' });
+      }
+    } catch (error: any) {
+      console.error("Sync Error:", error);
+      const errorMessage = error?.message || "不明なエラーが発生しました。";
+      setSyncMessage({ text: `同期中にエラーが発生しました: ${errorMessage}`, type: 'error' });
+    } finally {
+      setIsSyncing(false);
+      // 5秒後にメッセージを消す
+      setTimeout(() => setSyncMessage(null), 5000);
+    }
+  };
 
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
@@ -403,38 +485,69 @@ export default function App() {
             </nav>
 
             {activeView === 'management' && isAdmin && (
-              <section>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Users className="w-3 h-3" /> スタッフ管理
+              <section className="space-y-6">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Users className="w-3 h-3" /> スタッフ管理
+                    </h2>
+                    <button 
+                      onClick={() => setIsStaffModalOpen(true)}
+                      className="p-1.5 hover:bg-slate-100 rounded-lg text-blue-600 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {staffList.filter(s => s.role !== 'admin').map(staff => (
+                      <div key={staff.id} className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 transition-colors group">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-[10px]" style={{ backgroundColor: staff.color }}>
+                          {staff.name.charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate">{staff.name}</p>
+                          <p className="text-[9px] text-slate-400 uppercase font-bold">{staff.role}</p>
+                        </div>
+                        {staff.id !== user?.uid && (
+                          <button 
+                            onClick={() => setStaffToDelete(staff)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 transition-all"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <RefreshCw className="w-3 h-3" /> 外部データ連携
                   </h2>
                   <button 
-                    onClick={() => setIsStaffModalOpen(true)}
-                    className="p-1.5 hover:bg-slate-100 rounded-lg text-blue-600 transition-colors"
+                    onClick={handleSyncSchedules}
+                    disabled={isSyncing}
+                    className="w-full py-2.5 px-4 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 flex items-center justify-center gap-2 hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    <Plus className="w-4 h-4" />
+                    <RefreshCw className={cn("w-3.5 h-3.5", isSyncing && "animate-spin")} />
+                    {isSyncing ? '同期中...' : '試合日程を同期'}
                   </button>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {staffList.filter(s => s.role !== 'admin').map(staff => (
-                    <div key={staff.id} className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 transition-colors group">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-[10px]" style={{ backgroundColor: staff.color }}>
-                        {staff.name.charAt(0)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold truncate">{staff.name}</p>
-                        <p className="text-[9px] text-slate-400 uppercase font-bold">{staff.role}</p>
-                      </div>
-                      {staff.id !== user?.uid && (
-                        <button 
-                          onClick={() => setStaffToDelete(staff)}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 transition-all"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                  {syncMessage && (
+                    <motion.p 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={cn(
+                        "text-[10px] mt-2 px-1 font-bold",
+                        syncMessage.type === 'success' ? "text-green-600" : "text-red-600"
                       )}
-                    </div>
-                  ))}
+                    >
+                      {syncMessage.text}
+                    </motion.p>
+                  )}
+                  <p className="text-[10px] text-slate-400 mt-2 px-1">
+                    V・ファーレン長崎と長崎ヴェルカのホームゲーム日程を自動取得します。
+                  </p>
                 </div>
               </section>
             )}
@@ -598,21 +711,38 @@ export default function App() {
                             )}
                           >
                             <div className="flex items-center justify-between mb-0.5">
-                              <div className="flex flex-col">
-                                <span className={cn(
-                                  "w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-[10px] sm:text-xs font-bold rounded-full transition-all",
-                                  isToday ? "bg-blue-600 text-white shadow-lg shadow-blue-100" : 
-                                  getDay(day) === 0 || getHolidayName(day) ? "text-red-500" :
-                                  getDay(day) === 6 ? "text-blue-500" : "text-slate-600",
-                                  !isCurrentMonth && "opacity-30"
-                                )}>
-                                  {format(day, 'd')}
-                                </span>
-                                {isCurrentMonth && getHolidayName(day) && (
-                                  <span className="text-[7px] sm:text-[8px] text-red-400 font-bold truncate max-w-[40px] sm:max-w-[60px]">
-                                    {getHolidayName(day)}
+                              <div className="flex items-center gap-1">
+                                <div className="flex flex-col">
+                                  <span className={cn(
+                                    "w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-[10px] sm:text-xs font-bold rounded-full transition-all",
+                                    isToday ? "bg-blue-600 text-white shadow-lg shadow-blue-100" : 
+                                    getDay(day) === 0 || getHolidayName(day) ? "text-red-500" :
+                                    getDay(day) === 6 ? "text-blue-500" : "text-slate-600",
+                                    !isCurrentMonth && "opacity-30"
+                                  )}>
+                                    {format(day, 'd')}
                                   </span>
-                                )}
+                                  {isCurrentMonth && getHolidayName(day) && (
+                                    <span className="text-[7px] sm:text-[8px] text-red-400 font-bold truncate max-w-[40px] sm:max-w-[60px]">
+                                      {getHolidayName(day)}
+                                    </span>
+                                  )}
+                                </div>
+                                {/* イベントアイコンの表示 */}
+                                <div className="flex items-center gap-0.5">
+                                  {externalEvents
+                                    .filter(e => e.date === dayKey)
+                                    .map(event => (
+                                      <div key={event.id} title={event.title}>
+                                        {event.type === 'live' ? (
+                                          <Music className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-600" />
+                                        ) : (
+                                          <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-600" />
+                                        )}
+                                      </div>
+                                    ))
+                                  }
+                                </div>
                               </div>
                               {isAdmin && (
                                 <button 
@@ -628,6 +758,27 @@ export default function App() {
                               )}
                             </div>
                             <div className="flex flex-col gap-0.5 sm:gap-1 overflow-y-auto flex-1 scrollbar-hide">
+                              {/* 外部イベント（試合）の表示 */}
+                              {externalEvents
+                                .filter(e => e.date === dayKey)
+                                .map(event => (
+                                  <div 
+                                    key={event.id}
+                                    className={cn(
+                                      "px-1 py-0.5 sm:px-1.5 sm:py-1 rounded-md text-white text-[7px] sm:text-[9px] font-bold truncate flex items-center gap-1 shadow-sm",
+                                      event.type === 'live' ? "bg-purple-600" : "bg-blue-600"
+                                    )}
+                                    title={`${event.type === 'live' ? 'ライブ' : (event.type === 'v-varen' ? 'V・ファーレン' : '長崎ヴェルカ')}: ${event.title}`}
+                                  >
+                                    {event.type === 'live' ? (
+                                      <Music className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
+                                    ) : (
+                                      <Trophy className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
+                                    )}
+                                    <span className="truncate flex-1">{event.title}</span>
+                                  </div>
+                                ))
+                              }
                               {dayShifts.map(shift => {
                                 const staff = staffList.find(s => s.id === shift.staffId);
                                 const isPast = shift.endTime.getTime() < now.getTime();
@@ -670,7 +821,10 @@ export default function App() {
                                   >
                                     {isAdmin && <GripVertical className="w-2 h-2 sm:w-2.5 sm:h-2.5 opacity-50 shrink-0" />}
                                     <span className="opacity-80 font-mono text-[6px] sm:text-[8px]">{format(shift.startTime, 'HH:mm')}</span>
-                                    <span className="truncate flex-1">{staff?.name || shift.staffName}</span>
+                                    <span className="truncate flex-1">
+                                      {staff?.name || shift.staffName}
+                                      {shift.event && <span className="ml-1 opacity-70 font-normal">({shift.event})</span>}
+                                    </span>
                                   </motion.button>
                                 );
                               })}
@@ -680,6 +834,111 @@ export default function App() {
                       })}
                     </div>
                   </LayoutGroup>
+                </div>
+                {/* 特記事項エリア */}
+                <div className="p-4 border-t border-slate-100 bg-slate-50">
+                  <h3 className="text-sm font-bold text-slate-700 mb-2">
+                    {format(currentMonth, 'M月')}のイベント・特記事項一覧
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {[
+                      ...shifts
+                        .filter(s => isSameMonth(s.startTime, currentMonth) && ((s.event && s.event.trim() !== '') || (s.note && s.note.trim() !== '')))
+                        .map(s => ({ 
+                          id: s.id, 
+                          date: s.startTime, 
+                          title: s.event || s.title, 
+                          note: s.note, 
+                          staffName: s.staffName, 
+                          startTime: s.startTime, 
+                          endTime: s.endTime,
+                          isExternal: false 
+                        })),
+                      ...externalEvents
+                        .filter(e => isSameMonth(parseISO(e.date), currentMonth))
+                        .map(e => ({ 
+                          id: e.id, 
+                          date: parseISO(e.date), 
+                          title: e.title, 
+                          type: e.type,
+                          location: e.location,
+                          isExternal: true 
+                        }))
+                    ]
+                      .sort((a, b) => a.date.getTime() - b.date.getTime())
+                      .map(item => (
+                        <div key={item.id} className={cn(
+                          "text-xs p-3 rounded-xl border shadow-sm transition-all flex flex-col",
+                          item.isExternal 
+                            ? (item.type === 'live' ? "bg-purple-50 border-purple-100" : "bg-blue-50 border-blue-100") 
+                            : "bg-white border-slate-200"
+                        )}>
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <span className={cn(
+                              "font-bold px-2 py-0.5 rounded-md shrink-0",
+                              item.isExternal 
+                                ? (item.type === 'live' ? "text-purple-700 bg-purple-100" : "text-blue-700 bg-blue-100") 
+                                : "text-slate-800 bg-slate-100"
+                            )}>
+                              {format(item.date, 'M/d (E)', { locale: ja })}
+                            </span>
+                            {!item.isExternal && (
+                              <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                <Clock className="w-2.5 h-2.5" />
+                                {format(item.startTime!, 'HH:mm')} - {format(item.endTime!, 'HH:mm')} ({item.staffName})
+                              </div>
+                            )}
+                            {item.isExternal && (
+                              <div className="flex items-center gap-1">
+                                {item.type === 'live' ? (
+                                  <>
+                                    <Music className="w-3 h-3 text-purple-600" />
+                                    <span className="text-[10px] font-bold text-purple-600 uppercase">
+                                      ライブ・イベント
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trophy className="w-3 h-3 text-blue-600" />
+                                    <span className="text-[10px] font-bold text-blue-600 uppercase">
+                                      {item.type === 'v-varen' ? 'V・ファーレン' : '長崎ヴェルカ'}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div className={cn(
+                            "font-bold mb-1 flex items-center gap-1",
+                            item.isExternal 
+                              ? (item.type === 'live' ? "text-purple-800" : "text-blue-800") 
+                              : "text-blue-600"
+                          )}>
+                            {item.isExternal && item.type === 'live' ? (
+                              <Music className="w-3 h-3" />
+                            ) : (
+                              <CalendarIcon className="w-3 h-3" />
+                            )}
+                            {item.title}
+                          </div>
+                          {item.note && (
+                            <div className="text-slate-500 whitespace-pre-wrap">
+                              {item.note}
+                            </div>
+                          )}
+                          {item.location && (
+                            <div className="text-[10px] text-slate-400 mt-1">
+                              場所: {item.location}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    }
+                    {shifts.filter(s => isSameMonth(s.startTime, currentMonth) && ((s.event && s.event.trim() !== '') || (s.note && s.note.trim() !== ''))).length === 0 && 
+                     externalEvents.filter(e => isSameMonth(parseISO(e.date), currentMonth)).length === 0 && (
+                      <p className="text-xs text-slate-400 py-2">今月のイベントや特記事項はありません</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </>
@@ -827,6 +1086,7 @@ export default function App() {
                     const startStr = formData.get('startTime') as string;
                     const endStr = formData.get('endTime') as string;
                     const title = formData.get('title') as string;
+                    const event = formData.get('event') as string;
                     const note = formData.get('note') as string;
 
                     const startTime = parseISO(`${startDateStr}T${startStr}`);
@@ -839,6 +1099,7 @@ export default function App() {
                       startTime: Timestamp.fromDate(startTime),
                       endTime: Timestamp.fromDate(endTime),
                       title: title || '',
+                      event: event || '',
                       note: note || ''
                     };
 
@@ -940,6 +1201,26 @@ export default function App() {
                         defaultValue={editingShift?.title}
                         placeholder="例: 早番, 会議など"
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">イベント名（任意）</label>
+                      <input 
+                        type="text" 
+                        name="event" 
+                        defaultValue={editingShift?.event}
+                        placeholder="例: 店舗イベント, キャンペーンなど"
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">特記事項（任意）</label>
+                      <textarea 
+                        name="note" 
+                        defaultValue={editingShift?.note}
+                        placeholder="連絡事項や詳細など"
+                        rows={3}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
                       />
                     </div>
                   </div>

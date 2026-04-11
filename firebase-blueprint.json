@@ -24,9 +24,23 @@
         "startTime": { "type": "string", "format": "date-time", "description": "開始時間" },
         "endTime": { "type": "string", "format": "date-time", "description": "終了時間" },
         "title": { "type": "string", "description": "予定タイトル" },
+        "event": { "type": "string", "description": "イベント名" },
         "note": { "type": "string", "description": "備考" }
       },
       "required": ["staffId", "startTime", "endTime"]
+    },
+    "external_event": {
+      "title": "External Event",
+      "description": "外部から取得したイベント情報（試合日程、ライブなど）",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date", "description": "開催日" },
+        "title": { "type": "string", "description": "イベント名" },
+        "type": { "type": "string", "enum": ["v-varen", "velca", "live"], "description": "イベント種別" },
+        "location": { "type": "string", "description": "開催場所" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "更新日時" }
+      },
+      "required": ["date", "title", "type"]
     }
   },
   "firestore": {
@@ -37,6 +51,10 @@
     "/shifts/{shiftId}": {
       "schema": "shift",
       "description": "シフト一覧"
+    },
+    "/external_events/{eventId}": {
+      "schema": "external_event",
+      "description": "外部イベント一覧"
     }
   }
 }

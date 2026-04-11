@@ -58,7 +58,17 @@ service cloud.firestore {
              data.endTime is timestamp &&
              data.endTime > data.startTime &&
              (!('title' in data) || (data.title is string && data.title.size() < 200)) &&
+             (!('event' in data) || (data.event is string && data.event.size() < 200)) &&
              (!('note' in data) || (data.note is string && data.note.size() < 1000));
+    }
+
+    function isValidExternalEvent(data) {
+      return data.keys().hasAll(['date', 'title', 'type']) &&
+             data.date is string &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.type in ['v-varen', 'velca', 'live'] &&
+             (!('location' in data) || (data.location is string && data.location.size() < 200)) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
     }
 
     // ===============================================================
@@ -77,6 +87,12 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isValidShift(request.resource.data) && (request.resource.data.staffId == request.auth.uid || isAdmin());
       allow update: if isAuthenticated() && isValidShift(request.resource.data) && (resource.data.staffId == request.auth.uid || isAdmin());
       allow delete: if isAuthenticated() && (resource.data.staffId == request.auth.uid || isAdmin());
+    }
+
+    match /external_events/{eventId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidExternalEvent(request.resource.data);
+      allow delete: if isAdmin();
     }
   }
 }
