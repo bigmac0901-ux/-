@@ -1045,6 +1045,47 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+
+                  {/* External Sync Card */}
+                  <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm md:col-span-2">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center">
+                        <RefreshCw className="w-6 h-6 text-purple-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold">外部データ連携</h3>
+                        <p className="text-sm text-slate-500">V・ファーレン長崎、長崎ヴェルカ、ライブイベントの日程を自動取得</p>
+                      </div>
+                    </div>
+                    <div className="p-6 bg-slate-50 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="text-sm text-slate-600">
+                        <p className="font-bold mb-1">イベント情報の同期</p>
+                        <p className="text-xs text-slate-500">AIを使用して最新のイベントスケジュールを検索し、カレンダーに反映します。※同期には数十秒かかる場合があります。</p>
+                      </div>
+                      <div className="flex flex-col items-end shrink-0">
+                        <button 
+                          onClick={handleSyncSchedules}
+                          disabled={isSyncing}
+                          className="py-3 px-6 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 flex items-center justify-center gap-2 hover:bg-slate-100 transition-all active:scale-95 disabled:opacity-50 shadow-sm"
+                        >
+                          <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
+                          {isSyncing ? '同期中...' : 'イベント情報を同期'}
+                        </button>
+                        {syncMessage && (
+                          <motion.p 
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={cn(
+                              "text-xs mt-2 font-bold",
+                              syncMessage.type === 'success' ? "text-green-600" : "text-red-600"
+                            )}
+                          >
+                            {syncMessage.text}
+                          </motion.p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
