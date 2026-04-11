@@ -748,15 +748,18 @@ export default function App() {
                                 <div className="flex items-center gap-0.5">
                                   {externalEvents
                                     .filter(e => e.date === dayKey)
-                                    .map(event => (
-                                      <div key={event.id} title={event.title}>
-                                        {event.type === 'live' ? (
-                                          <Music className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-600" />
-                                        ) : (
-                                          <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-600" />
-                                        )}
-                                      </div>
-                                    ))
+                                    .map(event => {
+                                      const isPastDay = day.getTime() < new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                                      return (
+                                        <div key={event.id} title={event.title} className={cn(isPastDay && "opacity-30")}>
+                                          {event.type === 'live' ? (
+                                            <Music className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-600" />
+                                          ) : (
+                                            <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-600" />
+                                          )}
+                                        </div>
+                                      );
+                                    })
                                   }
                                 </div>
                               </div>
@@ -777,23 +780,27 @@ export default function App() {
                               {/* 外部イベント（試合）の表示 */}
                               {externalEvents
                                 .filter(e => e.date === dayKey)
-                                .map(event => (
-                                  <div 
-                                    key={event.id}
-                                    className={cn(
-                                      "px-1 py-0.5 sm:px-1.5 sm:py-1 rounded-md text-white text-[7px] sm:text-[9px] font-bold truncate flex items-center gap-1 shadow-sm",
-                                      event.type === 'live' ? "bg-purple-600" : "bg-blue-600"
-                                    )}
-                                    title={`${event.type === 'live' ? 'ライブ' : (event.type === 'v-varen' ? 'V・ファーレン' : '長崎ヴェルカ')}: ${event.title}`}
-                                  >
-                                    {event.type === 'live' ? (
-                                      <Music className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
-                                    ) : (
-                                      <Trophy className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
-                                    )}
-                                    <span className="truncate flex-1">{event.title}</span>
-                                  </div>
-                                ))
+                                .map(event => {
+                                  const isPastDay = day.getTime() < new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                                  return (
+                                    <div 
+                                      key={event.id}
+                                      className={cn(
+                                        "px-1 py-0.5 sm:px-1.5 sm:py-1 rounded-md text-white text-[7px] sm:text-[9px] font-bold truncate flex items-center gap-1 shadow-sm",
+                                        event.type === 'live' ? "bg-purple-600" : "bg-blue-600",
+                                        isPastDay && "opacity-30 shadow-none"
+                                      )}
+                                      title={`${event.type === 'live' ? 'ライブ' : (event.type === 'v-varen' ? 'V・ファーレン' : '長崎ヴェルカ')}: ${event.title}`}
+                                    >
+                                      {event.type === 'live' ? (
+                                        <Music className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
+                                      ) : (
+                                        <Trophy className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
+                                      )}
+                                      <span className="truncate flex-1">{event.title}</span>
+                                    </div>
+                                  );
+                                })
                               }
                               {dayShifts.map(shift => {
                                 const staff = staffList.find(s => s.id === shift.staffId);
@@ -882,14 +889,20 @@ export default function App() {
                         }))
                     ]
                       .sort((a, b) => a.date.getTime() - b.date.getTime())
-                      .map(item => (
-                        <div key={item.id} className={cn(
-                          "text-xs p-3 rounded-xl border shadow-sm transition-all flex flex-col",
-                          item.isExternal 
-                            ? (item.type === 'live' ? "bg-purple-50 border-purple-100" : "bg-blue-50 border-blue-100") 
-                            : "bg-white border-slate-200"
-                        )}>
-                          <div className="flex items-start justify-between gap-2 mb-2">
+                      .map(item => {
+                        const isPastItem = item.isExternal 
+                          ? item.date.getTime() < new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+                          : item.endTime!.getTime() < now.getTime();
+                        
+                        return (
+                          <div key={item.id} className={cn(
+                            "text-xs p-3 rounded-xl border shadow-sm transition-all flex flex-col",
+                            item.isExternal 
+                              ? (item.type === 'live' ? "bg-purple-50 border-purple-100" : "bg-blue-50 border-blue-100") 
+                              : "bg-white border-slate-200",
+                            isPastItem && "opacity-40 shadow-none"
+                          )}>
+                            <div className="flex items-start justify-between gap-2 mb-2">
                             <span className={cn(
                               "font-bold px-2 py-0.5 rounded-md shrink-0",
                               item.isExternal 
@@ -948,7 +961,8 @@ export default function App() {
                             </div>
                           )}
                         </div>
-                      ))
+                      );
+                    })
                     }
                     {shifts.filter(s => isSameMonth(s.startTime, currentMonth) && ((s.event && s.event.trim() !== '') || (s.note && s.note.trim() !== ''))).length === 0 && 
                      externalEvents.filter(e => isSameMonth(parseISO(e.date), currentMonth)).length === 0 && (
