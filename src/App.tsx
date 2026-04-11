@@ -198,6 +198,7 @@ export default function App() {
   const [pendingDrop, setPendingDrop] = useState<{ shiftId: string; targetDate: Date } | null>(null);
   const [shiftToDelete, setShiftToDelete] = useState<Shift | null>(null);
   const [staffToDelete, setStaffToDelete] = useState<Staff | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Auth Listener
   useEffect(() => {
@@ -323,11 +324,21 @@ export default function App() {
   };
 
   const handleLogin = async () => {
+    setLoginError(null);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login Error:", error);
+      if (error.code === 'auth/unauthorized-domain') {
+        setLoginError("このドメインは許可されていません。FirebaseコンソールでVercelのドメインを承認済みドメインに追加してください。");
+      } else if (error.code === 'auth/popup-blocked') {
+        setLoginError("ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください。");
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        setLoginError("ログインがキャンセルされました。");
+      } else {
+        setLoginError(`ログインエラー: ${error.message}`);
+      }
     }
   };
 
@@ -609,6 +620,11 @@ export default function App() {
                     <LogOut className="w-4 h-4 rotate-180" />
                     管理者・スタッフ ログイン
                   </button>
+                  {loginError && (
+                    <p className="text-[10px] text-red-500 font-bold px-1 leading-relaxed">
+                      {loginError}
+                    </p>
+                  )}
                 </div>
               )
             ) : (
