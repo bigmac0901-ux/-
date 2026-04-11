@@ -1,7 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 export interface ExternalEvent {
   id?: string;
   date: string;
@@ -16,6 +14,8 @@ export async function fetchSportsSchedules(): Promise<ExternalEvent[]> {
     console.error("GEMINI_API_KEY is not set");
     throw new Error("APIキーが設定されていません。設定を確認してください。");
   }
+
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const currentYear = new Date().getFullYear();
