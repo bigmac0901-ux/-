@@ -623,7 +623,7 @@ export default function App() {
         <main className="flex-1 flex flex-col min-w-0 bg-slate-50">
           {activeView === 'calendar' ? (
             <>
-              <header className="h-auto min-h-16 bg-white border-b border-slate-200 px-4 lg:px-6 py-3 flex flex-col sm:flex-row items-center justify-between sticky top-0 z-10 gap-4">
+              <header className="h-auto min-h-16 bg-white border-b border-slate-200 px-4 lg:px-6 py-3 flex flex-col sm:flex-row items-center justify-between sticky top-0 z-30 gap-4">
                 <div className="flex items-center justify-between w-full sm:w-auto gap-4">
                   <button 
                     onClick={() => setIsSidebarOpen(true)}
@@ -944,7 +944,7 @@ export default function App() {
             </>
           ) : (
             <div className="flex-1 flex flex-col">
-              <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10">
+              <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30">
                 <div className="flex items-center gap-4">
                   <button 
                     onClick={() => setIsSidebarOpen(true)}
