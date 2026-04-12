@@ -453,7 +453,7 @@ export default function App() {
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-100">
                 <CalendarIcon className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-lg font-bold tracking-tight">StaffSync</h1>
+              <h1 className="text-lg font-bold tracking-tight">AIHS StaffShift</h1>
             </div>
             <button 
               onClick={() => setIsSidebarOpen(false)}
