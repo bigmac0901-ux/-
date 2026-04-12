@@ -21,10 +21,10 @@ export async function fetchSportsSchedules(): Promise<ExternalEvent[]> {
     const currentYear = new Date().getFullYear();
     const nextYear = currentYear + 1;
     
-    console.log("Starting Step 1: Search events with gemini-3-flash-preview...");
+    console.log("Starting Step 1: Search events with gemini-2.0-flash...");
     // ステップ1: Google検索を使用して最新のイベント情報をテキストで取得
     const searchResponse = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: `長崎県内の以下の施設の最新イベント日程（${currentYear}年〜${nextYear}年）を教えてください。
 1. V・ファーレン長崎のホームゲーム
 2. 長崎ヴェルカのホームゲーム
@@ -44,10 +44,10 @@ export async function fetchSportsSchedules(): Promise<ExternalEvent[]> {
     }
     console.log("Step 1 completed. Raw text length:", rawText.length);
 
-    console.log("Starting Step 2: Format to JSON with gemini-3-flash-preview...");
+    console.log("Starting Step 2: Format to JSON with gemini-2.0-flash...");
     // ステップ2: 取得したテキスト情報をJSON形式に整形
     const formatResponse = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: `以下のテキストからイベント日程を抽出し、JSON形式の配列で返してください。
 各要素は以下のプロパティを持ってください：
 - date: YYYY-MM-DD形式の日付
