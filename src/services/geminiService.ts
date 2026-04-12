@@ -30,6 +30,8 @@ export async function fetchSportsSchedules(): Promise<ExternalEvent[]> {
 3. 長崎ブリックホールのライブ・コンサート
 4. 長崎スタジアムシティで開催されるライブ・イベント
 
+※注意：「THE CLUB NAGASAKI」のイベントは含めないでください。
+
 日付（YYYY-MM-DD）、イベント名、場所を含めてください。`,
       config: {
         tools: [{ googleSearch: {} }]
@@ -45,6 +47,8 @@ export async function fetchSportsSchedules(): Promise<ExternalEvent[]> {
     const formatResponse = await ai.models.generateContent({
       model: "gemini-2.0-flash",
       contents: `以下のテキストからイベント日程を抽出し、JSON形式の配列で返してください。
+「THE CLUB NAGASAKI」に関連するイベントは除外してください。
+
 各要素は以下のプロパティを持ってください：
 - date: YYYY-MM-DD形式の日付
 - title: イベント名
@@ -76,7 +80,14 @@ ${rawText}`,
       return [];
     }
     
-    return JSON.parse(jsonText.trim()) as ExternalEvent[];
+    const events = JSON.parse(jsonText.trim()) as ExternalEvent[];
+    //念のため、タイトルや場所に「THE CLUB NAGASAKI」が含まれるものをフィルタリング
+    return events.filter(event => {
+      const title = event.title.toUpperCase();
+      const location = (event.location || '').toUpperCase();
+      const excludeTerm = "THE CLUB NAGASAKI";
+      return !title.includes(excludeTerm) && !location.includes(excludeTerm);
+    });
   } catch (error: any) {
     console.error("Detailed Error fetching sports schedules:", error);
     throw new Error(error.message || "同期中にエラーが発生しました。");
