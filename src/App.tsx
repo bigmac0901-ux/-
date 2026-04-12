@@ -445,10 +445,10 @@ export default function App() {
 
         {/* Sidebar */}
         <aside className={cn(
-          "fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 p-4 flex flex-col gap-6 z-50 transition-transform duration-300 lg:relative lg:translate-x-0",
+          "fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 p-4 flex flex-col z-50 transition-transform duration-300 lg:relative lg:translate-x-0 overflow-y-auto",
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}>
-          <div className="flex items-center justify-between lg:justify-start gap-2">
+          <div className="flex items-center justify-between lg:justify-start gap-2 mb-6 shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-100">
                 <CalendarIcon className="w-5 h-5 text-white" />
