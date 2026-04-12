@@ -810,12 +810,12 @@ export default function App() {
                                     layout
                                     layoutId={shift.id}
                                     key={shift.id}
-                                    drag={isAdmin}
+                                    drag={isAdmin && !isPast}
                                     dragSnapToOrigin
                                     dragElastic={0.1}
                                     dragMomentum={false}
                                     onDragEnd={(e, info) => {
-                                      if (!isAdmin) return;
+                                      if (!isAdmin || isPast) return;
                                       const elements = document.elementsFromPoint(info.point.x, info.point.y);
                                       const cell = elements.find(el => el.classList.contains('calendar-cell'));
                                       if (cell) {
