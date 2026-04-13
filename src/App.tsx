@@ -450,8 +450,13 @@ export default function App() {
         )}>
           <div className="flex items-center justify-between lg:justify-start gap-2 mb-6 shrink-0">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-100">
-                <CalendarIcon className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
+                <img 
+                  src="/favicon.png" 
+                  alt="App Icon" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               <h1 className="text-lg font-bold tracking-tight">AIHS StaffShift</h1>
             </div>
