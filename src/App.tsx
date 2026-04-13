@@ -450,12 +450,20 @@ export default function App() {
         )}>
           <div className="flex items-center justify-between lg:justify-start gap-2 mb-6 shrink-0">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-slate-100">
                 <img 
-                  src="/favicon.png?v=1" 
+                  src="favicon.png?v=1" 
                   alt="App Icon" 
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    // フォールバック: 画像が読み込めない場合は元のアイコンを表示
+                    e.currentTarget.style.display = 'none';
+                    const parent = e.currentTarget.parentElement;
+                    if (parent) {
+                      parent.innerHTML = '<div class="w-5 h-5 text-blue-600">📅</div>';
+                    }
+                  }}
                 />
               </div>
               <h1 className="text-lg font-bold tracking-tight">AIHS StaffShift</h1>
