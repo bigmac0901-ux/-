@@ -452,9 +452,9 @@ export default function App() {
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-slate-100">
                 <img 
-                  src="favicon.png?v=1" 
+                  src="/favicon.png?v=2" 
                   alt="App Icon" 
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                   onError={(e) => {
                     // フォールバック: 画像が読み込めない場合は元のアイコンを表示
