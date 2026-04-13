@@ -452,7 +452,7 @@ export default function App() {
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
                 <img 
-                  src="/favicon.png" 
+                  src="/favicon.png?v=1" 
                   alt="App Icon" 
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
