@@ -23,7 +23,7 @@ export async function fetchSportsSchedules(): Promise<ExternalEvent[]> {
     
     // ステップ1: Google検索を使用して最新のイベント情報をテキストで取得
     const searchResponse = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3-flash-preview",
       contents: `長崎県内の以下の施設の最新イベント日程（${currentYear}年〜${nextYear}年）を教えてください。
 1. V・ファーレン長崎のホームゲーム
 2. 長崎ヴェルカのホームゲーム
@@ -45,7 +45,7 @@ export async function fetchSportsSchedules(): Promise<ExternalEvent[]> {
 
     // ステップ2: 取得したテキスト情報をJSON形式に整形
     const formatResponse = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3-flash-preview",
       contents: `以下のテキストからイベント日程を抽出し、JSON形式の配列で返してください。
 「THE CLUB NAGASAKI」に関連するイベントは除外してください。
 
