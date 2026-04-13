@@ -70,6 +70,7 @@ import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { fetchSportsSchedules, type ExternalEvent } from './services/geminiService';
+import faviconUrl from '../public/app-icon.png';
 
 // --- Constants ---
 const ADMIN_EMAILS = [
@@ -452,7 +453,7 @@ export default function App() {
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-slate-100">
                 <img 
-                  src="/favicon.png?v=2" 
+                  src={faviconUrl} 
                   alt="App Icon" 
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
