@@ -810,8 +810,8 @@ export default function App() {
                                     <div 
                                       key={event.id}
                                       className={cn(
-                                        "px-1 py-0.5 sm:px-1.5 sm:py-1 rounded-md text-white text-[7px] sm:text-[9px] font-bold truncate flex items-center gap-1 shadow-sm",
-                                        event.type === 'live' ? "bg-purple-600" : "bg-blue-600",
+                                        "px-1 py-0.5 sm:px-1.5 sm:py-1 rounded-md text-[7px] sm:text-[9px] font-bold truncate flex items-center gap-1 border shadow-sm",
+                                        event.type === 'live' ? "bg-purple-50 text-purple-700 border-purple-100" : "bg-blue-50 text-blue-700 border-blue-100",
                                         isPastDay && "opacity-30 shadow-none"
                                       )}
                                       title={`${event.type === 'live' ? 'ライブ' : (event.type === 'v-varen' ? 'V・ファーレン' : '長崎ヴェルカ')}: ${event.title}`}
