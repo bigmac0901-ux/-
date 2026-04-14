@@ -44,11 +44,14 @@ service cloud.firestore {
     function isValidStaff(data) {
       return data.keys().hasAll(['name', 'role']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             (!('email' in data) || isValidEmail(data.email)) &&
+             (!('email' in data) || (data.email == "" || isValidEmail(data.email))) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() < 20)) &&
              data.role in ['admin', 'staff'] &&
              (!('color' in data) || (data.color is string && data.color.size() < 20)) &&
              (!('isManual' in data) || data.isManual is bool) &&
-             (!('loginId' in data) || (data.loginId is string && data.loginId.size() < 50));
+             (!('loginId' in data) || (data.loginId is string && data.loginId.size() < 50)) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
     }
 
     function isValidShift(data) {

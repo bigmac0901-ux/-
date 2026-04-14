@@ -512,31 +512,34 @@ export default function App() {
                     </button>
                   </div>
                   <div className="flex flex-col gap-2">
-                    {staffList.filter(s => s.role !== 'admin').map(staff => (
+                    {staffList.map(staff => (
                       <div 
                         key={staff.id} 
                         onClick={() => setEditingStaff(staff)}
-                        className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 transition-colors group cursor-pointer"
+                        className="w-full flex items-center gap-2 p-2 rounded-xl hover:bg-slate-100 transition-all group cursor-pointer text-left"
+                        role="button"
+                        tabIndex={0}
                       >
-                        <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-[10px]" style={{ backgroundColor: staff.color }}>
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm" style={{ backgroundColor: staff.color }}>
                           {staff.name.charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold truncate">{staff.name}</p>
+                          <p className="text-sm font-bold text-slate-700 truncate">{staff.name}</p>
                           <div className="flex items-center gap-2">
-                            <p className="text-[9px] text-slate-400 uppercase font-bold">{staff.role}</p>
-                            {staff.phone && <p className="text-[9px] text-slate-400 truncate">| {staff.phone}</p>}
+                            <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider">{staff.role}</p>
+                            {staff.phone && <p className="text-[10px] text-slate-400 truncate">| {staff.phone}</p>}
                           </div>
                         </div>
                         {staff.id !== user?.uid && (
                           <button 
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               setStaffToDelete(staff);
                             }}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 transition-all"
+                            className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>
@@ -581,9 +584,18 @@ export default function App() {
                   <Users className="w-3 h-3" /> スタッフ一覧
                 </h2>
                 <div className="flex flex-col gap-1 px-1.5">
-                  {staffList.filter(s => s.role !== 'admin').map(staff => (
-                    <div key={staff.id} className="flex items-center gap-2 p-1.5 rounded-xl">
-                      <div className="w-5 h-5 rounded-md flex items-center justify-center text-white font-bold text-[8px]" style={{ backgroundColor: staff.color }}>
+                  {staffList.map(staff => (
+                    <div 
+                      key={staff.id} 
+                      onClick={() => isAdmin && setEditingStaff(staff)}
+                      className={cn(
+                        "flex items-center gap-2 p-1.5 rounded-xl transition-all text-left w-full",
+                        isAdmin ? "hover:bg-slate-50 cursor-pointer" : "cursor-default"
+                      )}
+                      role={isAdmin ? "button" : undefined}
+                      tabIndex={isAdmin ? 0 : undefined}
+                    >
+                      <div className="w-5 h-5 rounded-md flex items-center justify-center text-white font-bold text-[8px] shrink-0 shadow-sm" style={{ backgroundColor: staff.color }}>
                         {staff.name.charAt(0)}
                       </div>
                       <p className="text-[11px] font-medium text-slate-600 truncate">{staff.name}</p>
@@ -1383,6 +1395,16 @@ export default function App() {
                           email,
                           updatedAt: Timestamp.now()
                         });
+
+                        // 名前が変更された場合、関連するシフトのスタッフ名も更新する
+                        if (editingStaff.name !== name) {
+                          const relatedShifts = shifts.filter(s => s.staffId === editingStaff.id);
+                          for (const shift of relatedShifts) {
+                            await updateDoc(doc(db, 'shifts', shift.id), {
+                              staffName: name
+                            });
+                          }
+                        }
                       } else {
                         await addDoc(collection(db, 'staff'), {
                           name,
