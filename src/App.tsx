@@ -1035,16 +1035,22 @@ export default function App() {
                     <div className="space-y-3">
                       {staffList.map(staff => (
                         <div key={staff.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl group">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold" style={{ backgroundColor: staff.color }}>
+                          <div 
+                            className="flex items-center gap-3 flex-1 cursor-pointer"
+                            onClick={() => setEditingStaff(staff)}
+                          >
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shrink-0" style={{ backgroundColor: staff.color }}>
                               {staff.name.charAt(0)}
                             </div>
-                            <div>
-                              <p className="font-bold text-sm">{staff.name}</p>
-                              <p className="text-xs text-slate-400">{staff.email}</p>
+                            <div className="min-w-0">
+                              <p className="font-bold text-sm truncate">{staff.name}</p>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
+                                <p className="text-[10px] text-slate-400 truncate">{staff.email}</p>
+                                {staff.phone && <p className="text-[10px] text-slate-400 truncate sm:border-l sm:pl-2 border-slate-200">{staff.phone}</p>}
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 ml-2">
                             <select
                               value={staff.role}
                               onChange={async (e) => {
