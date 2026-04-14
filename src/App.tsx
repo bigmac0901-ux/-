@@ -123,6 +123,7 @@ interface Staff {
   id: string;
   name: string;
   email?: string;
+  phone?: string;
   loginId?: string;
   role: 'admin' | 'staff';
   color: string;
@@ -198,6 +199,7 @@ export default function App() {
   const [pendingDrop, setPendingDrop] = useState<{ shiftId: string; targetDate: Date } | null>(null);
   const [shiftToDelete, setShiftToDelete] = useState<Shift | null>(null);
   const [staffToDelete, setStaffToDelete] = useState<Staff | null>(null);
+  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // Auth Listener
@@ -511,17 +513,27 @@ export default function App() {
                   </div>
                   <div className="flex flex-col gap-2">
                     {staffList.filter(s => s.role !== 'admin').map(staff => (
-                      <div key={staff.id} className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 transition-colors group">
+                      <div 
+                        key={staff.id} 
+                        onClick={() => setEditingStaff(staff)}
+                        className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 transition-colors group cursor-pointer"
+                      >
                         <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-[10px]" style={{ backgroundColor: staff.color }}>
                           {staff.name.charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold truncate">{staff.name}</p>
-                          <p className="text-[9px] text-slate-400 uppercase font-bold">{staff.role}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-[9px] text-slate-400 uppercase font-bold">{staff.role}</p>
+                            {staff.phone && <p className="text-[9px] text-slate-400 truncate">| {staff.phone}</p>}
+                          </div>
                         </div>
                         {staff.id !== user?.uid && (
                           <button 
-                            onClick={() => setStaffToDelete(staff)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStaffToDelete(staff);
+                            }}
                             className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 transition-all"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1321,13 +1333,16 @@ export default function App() {
             </div>
           )}
 
-          {isStaffModalOpen && (
+          {(isStaffModalOpen || editingStaff) && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => setIsStaffModalOpen(false)}
+                onClick={() => {
+                  setIsStaffModalOpen(false);
+                  setEditingStaff(null);
+                }}
                 className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
               />
               <motion.div 
@@ -1337,8 +1352,14 @@ export default function App() {
                 className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
               >
                 <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between shrink-0">
-                  <h3 className="text-xl font-bold">スタッフを追加</h3>
-                  <button onClick={() => setIsStaffModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <h3 className="text-xl font-bold">{editingStaff ? 'スタッフを編集' : 'スタッフを追加'}</h3>
+                  <button 
+                    onClick={() => {
+                      setIsStaffModalOpen(false);
+                      setEditingStaff(null);
+                    }} 
+                    className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                  >
                     <X className="w-6 h-6 text-slate-400" />
                   </button>
                 </div>
@@ -1349,18 +1370,34 @@ export default function App() {
                     const name = formData.get('name') as string;
                     const role = formData.get('role') as 'admin' | 'staff';
                     const color = formData.get('color') as string;
+                    const phone = formData.get('phone') as string;
+                    const email = formData.get('email') as string;
 
                     try {
-                      await addDoc(collection(db, 'staff'), {
-                        name,
-                        role,
-                        color,
-                        isManual: true,
-                        createdAt: Timestamp.now()
-                      });
+                      if (editingStaff) {
+                        await updateDoc(doc(db, 'staff', editingStaff.id), {
+                          name,
+                          role,
+                          color,
+                          phone,
+                          email,
+                          updatedAt: Timestamp.now()
+                        });
+                      } else {
+                        await addDoc(collection(db, 'staff'), {
+                          name,
+                          role,
+                          color,
+                          phone,
+                          email,
+                          isManual: true,
+                          createdAt: Timestamp.now()
+                        });
+                      }
                       setIsStaffModalOpen(false);
+                      setEditingStaff(null);
                     } catch (err) {
-                      console.error("Staff add error:", err);
+                      console.error("Staff save error:", err);
                     }
                   }}
                   className="p-8 flex flex-col gap-6 overflow-y-auto"
@@ -1371,7 +1408,28 @@ export default function App() {
                       type="text" 
                       name="name" 
                       required 
+                      defaultValue={editingStaff?.name || ''}
                       placeholder="スタッフ名を入力"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">連絡先 (電話番号)</label>
+                    <input 
+                      type="tel" 
+                      name="phone" 
+                      defaultValue={editingStaff?.phone || ''}
+                      placeholder="090-0000-0000"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">メールアドレス</label>
+                    <input 
+                      type="email" 
+                      name="email" 
+                      defaultValue={editingStaff?.email || ''}
+                      placeholder="example@mail.com"
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                     />
                   </div>
@@ -1380,6 +1438,7 @@ export default function App() {
                     <select 
                       name="role" 
                       required 
+                      defaultValue={editingStaff?.role || 'staff'}
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                     >
                       <option value="staff">スタッフ</option>
@@ -1402,7 +1461,13 @@ export default function App() {
                         '#475569'  // Slate
                       ].map(c => (
                         <label key={c} className="relative cursor-pointer group">
-                          <input type="radio" name="color" value={c} className="peer sr-only" defaultChecked={c === '#ef4444'} />
+                          <input 
+                            type="radio" 
+                            name="color" 
+                            value={c} 
+                            className="peer sr-only" 
+                            defaultChecked={editingStaff ? editingStaff.color === c : c === '#ef4444'} 
+                          />
                           <div className="w-full aspect-square rounded-xl border-2 border-transparent peer-checked:border-slate-900 peer-checked:scale-110 transition-all shadow-sm group-hover:scale-105" style={{ backgroundColor: c }} />
                         </label>
                       ))}
@@ -1412,7 +1477,7 @@ export default function App() {
                     type="submit"
                     className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-xl shadow-blue-100"
                   >
-                    スタッフを追加
+                    {editingStaff ? '変更を保存' : 'スタッフを追加'}
                   </button>
                 </form>
               </motion.div>
