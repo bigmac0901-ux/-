@@ -1480,7 +1480,12 @@ export default function App() {
                         '#06b6d4', // Cyan
                         '#ec4899', // Pink
                         '#84cc16', // Lime
-                        '#475569'  // Slate
+                        '#475569', // Slate
+                        '#10b981', // Emerald
+                        '#6366f1', // Indigo
+                        '#d946ef', // Fuchsia
+                        '#f43f5e', // Rose
+                        '#eab308'  // Yellow
                       ].map(c => (
                         <label key={c} className="relative cursor-pointer group">
                           <input 
