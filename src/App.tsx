@@ -1020,7 +1020,9 @@ export default function App() {
                         </div>
                         <div>
                           <h3 className="text-lg font-bold">スタッフ管理</h3>
-                          <p className="text-sm text-slate-500">スタッフの追加・削除・権限設定</p>
+                          <p className="text-sm text-slate-500">
+                            スタッフの追加・削除・<br className="sm:hidden" />権限設定
+                          </p>
                         </div>
                       </div>
                       <button 
