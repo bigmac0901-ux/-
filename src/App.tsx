@@ -43,7 +43,8 @@ import {
   parseISO,
   getDay,
   addDays,
-  isBefore
+  isBefore,
+  startOfDay
 } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { 
@@ -64,7 +65,9 @@ import {
   Eye,
   RefreshCw,
   Trophy,
-  Music
+  Music,
+  Move,
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -196,7 +199,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<'calendar' | 'management'>('calendar');
   const now = new Date();
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
-  const [pendingDrop, setPendingDrop] = useState<{ shiftId: string; targetDate: Date } | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<{ shiftId: string; targetDate: Date; isCopy?: boolean } | null>(null);
   const [shiftToDelete, setShiftToDelete] = useState<Shift | null>(null);
   const [staffToDelete, setStaffToDelete] = useState<Staff | null>(null);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
@@ -743,7 +746,7 @@ export default function App() {
                             key={day.toString()} 
                             data-date={dayKey}
                             className={cn(
-                              "calendar-cell p-1 sm:p-1.5 border-r border-b border-slate-100 flex flex-col gap-0.5 sm:gap-1 transition-colors group relative overflow-hidden",
+                              "calendar-cell p-1 sm:p-1.5 border-r border-b border-slate-100 flex flex-col gap-0.5 sm:gap-1 transition-colors group relative",
                               (isSunday || isHoliday) ? "bg-red-100/50" : 
                               isSaturday ? "bg-blue-100/50" : "bg-white",
                               !isCurrentMonth && "opacity-40 grayscale-[0.2]",
@@ -773,7 +776,7 @@ export default function App() {
                                   {externalEvents
                                     .filter(e => e.date === dayKey)
                                     .map(event => {
-                                      const isPastDay = day.getTime() < new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                                      const isPastDay = isBefore(day, startOfDay(now));
                                       return (
                                         <div key={event.id} title={event.title} className={cn(isPastDay && "opacity-30")}>
                                           {event.type === 'live' ? (
@@ -800,56 +803,84 @@ export default function App() {
                                 </button>
                               )}
                             </div>
-                            <div className="flex flex-col gap-0.5 sm:gap-1 overflow-y-auto flex-1 scrollbar-hide">
+                            <div className="flex flex-col gap-0.5 sm:gap-1 flex-1 scrollbar-hide">
                               {/* 外部イベント（試合）の表示 */}
                               {externalEvents
                                 .filter(e => e.date === dayKey)
                                 .map(event => {
-                                  const isPastDay = day.getTime() < new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                                  const isPastDay = isBefore(day, startOfDay(now));
                                   return (
-                                    <div 
-                                      key={event.id}
-                                      className={cn(
-                                        "px-1 py-0.5 sm:px-1.5 sm:py-1 rounded-md text-[7px] sm:text-[9px] font-bold truncate flex items-center gap-1 border shadow-sm",
-                                        event.type === 'live' ? "bg-purple-50 text-purple-700 border-purple-100" : "bg-blue-50 text-blue-700 border-blue-100",
-                                        isPastDay && "opacity-30 shadow-none"
-                                      )}
-                                      title={`${event.type === 'live' ? 'ライブ' : (event.type === 'v-varen' ? 'V・ファーレン' : '長崎ヴェルカ')}: ${event.title}`}
-                                    >
-                                      {event.type === 'live' ? (
-                                        <Music className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
-                                      ) : (
-                                        <Trophy className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
-                                      )}
-                                      <span className="truncate flex-1">{event.title}</span>
-                                    </div>
+                                        <div 
+                                          key={event.id}
+                                          className={cn(
+                                            "px-1 py-0.5 sm:px-1.5 sm:py-1 rounded-md text-[7px] sm:text-[9px] font-bold truncate flex items-center gap-1 border shadow-sm",
+                                            event.type === 'live' ? "bg-purple-50 text-purple-700 border-purple-100" : "bg-blue-50 text-blue-700 border-blue-100",
+                                            isPastDay && "opacity-30 shadow-none"
+                                          )}
+                                          title={`${event.type === 'live' ? 'ライブ' : (event.type === 'v-varen' ? 'V・ファーレン' : '長崎ヴェルカ')}: ${event.title}`}
+                                        >
+                                          {event.type === 'live' ? (
+                                            <Music className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
+                                          ) : (
+                                            <Trophy className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
+                                          )}
+                                          <span className="truncate flex-1">{event.title}</span>
+                                        </div>
                                   );
                                 })
                               }
                               {dayShifts.map(shift => {
                                 const staff = staffList.find(s => s.id === shift.staffId);
-                                const isPast = shift.endTime.getTime() < now.getTime();
+                                const isPastDay = isBefore(day, startOfDay(now));
                                 return (
                                   <motion.button
                                     layout
                                     layoutId={shift.id}
                                     key={shift.id}
-                                    drag={isAdmin && !isPast}
+                                    drag={isAdmin}
                                     dragSnapToOrigin
-                                    dragElastic={0.1}
+                                    dragElastic={0}
                                     dragMomentum={false}
+                                    whileDrag={{ 
+                                      zIndex: 100, 
+                                      scale: 1.05, 
+                                      boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+                                      cursor: 'grabbing'
+                                    }}
                                     onDragEnd={(e, info) => {
-                                      if (!isAdmin || isPast) return;
-                                      const elements = document.elementsFromPoint(info.point.x, info.point.y);
-                                      const cell = elements.find(el => el.classList.contains('calendar-cell'));
+                                      if (!isAdmin) return;
+                                      
+                                      // Viewport-relative coordinates are needed for elementsFromPoint
+                                      // info.point is absolute (page-relative), so we subtract scroll
+                                      const x = (e as any).clientX || (e as any).changedTouches?.[0]?.clientX || (info.point.x - window.scrollX);
+                                      const y = (e as any).clientY || (e as any).changedTouches?.[0]?.clientY || (info.point.y - window.scrollY);
+                                      
+                                      const elements = document.elementsFromPoint(x, y);
+                                      // Find the first element that is or is inside a calendar cell
+                                      const cell = elements
+                                        .map(el => (el as HTMLElement).closest('.calendar-cell'))
+                                        .find(el => el !== null) as HTMLElement | undefined;
+                                      
                                       if (cell) {
                                         const dateStr = cell.getAttribute('data-date');
-                                        if (dateStr && dateStr !== dayKey) {
-                                          setPendingDrop({ shiftId: shift.id, targetDate: parseISO(dateStr) });
+                                        if (dateStr) {
+                                          const targetDate = parseISO(dateStr);
+                                          const isTargetPast = isBefore(targetDate, startOfDay(now));
+                                          
+                                          // 本日以降のすべての日程で移動とコピーが表示するように
+                                          if (isTargetPast) return;
+
+                                          // Small delay to prevent accidental backdrop clicks or edit modal opening on mobile
+                                          setTimeout(() => {
+                                            setPendingDrop({ 
+                                              shiftId: shift.id, 
+                                              targetDate 
+                                            });
+                                          }, 100);
                                         }
                                       }
                                     }}
-                                    onClick={() => {
+                                    onTap={() => {
                                       if (!isAdmin) return;
                                       setEditingShift(shift);
                                       setSelectedDate(shift.startTime);
@@ -858,12 +889,12 @@ export default function App() {
                                     className={cn(
                                       "text-left px-1 py-0.5 sm:px-1.5 sm:py-1 rounded-md sm:rounded-lg text-[7px] sm:text-[9px] font-bold truncate transition-all flex items-center gap-0.5 sm:gap-1 select-none z-10 shadow-sm group/shift",
                                       isAdmin ? "cursor-grab active:cursor-grabbing hover:brightness-95 active:scale-95" : "cursor-default",
-                                      isPast && "shadow-none border-transparent"
+                                      isPastDay && "shadow-none border-transparent"
                                     )}
                                     style={{ 
                                       backgroundColor: staff?.color || '#3b82f6',
                                       color: '#fff',
-                                      opacity: isPast ? 0.3 : 1
+                                      opacity: isPastDay ? 0.3 : 1
                                     }}
                                   >
                                     {isAdmin && <GripVertical className="w-2 h-2 sm:w-2.5 sm:h-2.5 opacity-50 shrink-0" />}
@@ -1520,7 +1551,7 @@ export default function App() {
           )}
 
           {pendingDrop && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div key="pending-drop-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1544,14 +1575,16 @@ export default function App() {
                 <div className="flex flex-col gap-3">
                   <button 
                     onClick={() => handleShiftAction('move')}
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-100"
+                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-100 flex items-center justify-center gap-2"
                   >
+                    <Move className="w-5 h-5" />
                     移動する
                   </button>
                   <button 
                     onClick={() => handleShiftAction('copy')}
-                    className="w-full py-4 bg-slate-100 text-slate-900 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
+                    className="w-full py-4 bg-slate-100 text-slate-900 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2"
                   >
+                    <Copy className="w-5 h-5" />
                     コピーする
                   </button>
                   <button 
