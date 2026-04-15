@@ -271,6 +271,7 @@ export default function App() {
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
 
   // Auth Listener
   useEffect(() => {
@@ -572,7 +573,7 @@ export default function App() {
           <div className="flex items-center justify-between lg:justify-start gap-2 mb-6 shrink-0">
             <div className="flex items-center gap-2">
               <img 
-                src="/alphalogo.jpg" 
+                src="/favicon.png" 
                 alt="AIHS StaffShift" 
                 className="w-8 h-8 rounded-lg object-contain" 
                 referrerPolicy="no-referrer"
@@ -865,11 +866,12 @@ export default function App() {
                             key={day.toString()} 
                             data-date={dayKey}
                             className={cn(
-                              "calendar-cell p-1 sm:p-1.5 border-r border-b border-slate-100 flex flex-col gap-0.5 sm:gap-1 transition-colors group relative",
+                              "calendar-cell p-1 sm:p-1.5 border-r border-b border-slate-100 flex flex-col gap-0.5 sm:gap-1 transition-all group relative",
                               (isSunday || isHoliday) ? "bg-red-100/50" : 
                               isSaturday ? "bg-blue-100/50" : "bg-white",
                               !isCurrentMonth && "opacity-40 grayscale-[0.2]",
-                              i % 7 === 6 && "border-r-0"
+                              i % 7 === 6 && "border-r-0",
+                              dragOverDate === dayKey && "ring-2 ring-blue-500 ring-inset bg-blue-50/80 z-20 shadow-inner"
                             )}
                           >
                             <div className="flex items-center justify-between mb-0.5">
@@ -962,20 +964,39 @@ export default function App() {
                                     dragMomentum={false}
                                     whileDrag={{ 
                                       zIndex: 100, 
-                                      scale: 1.05, 
+                                      scale: 1.02, 
+                                      opacity: 0.85,
                                       boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
                                       cursor: 'grabbing'
                                     }}
-                                    onDragEnd={(e, info) => {
+                                    onDragStart={() => {
                                       if (!isAdmin) return;
-                                      
-                                      // Viewport-relative coordinates are needed for elementsFromPoint
-                                      // info.point is absolute (page-relative), so we subtract scroll
+                                    }}
+                                    onDrag={(e, info) => {
+                                      if (!isAdmin) return;
                                       const x = (e as any).clientX || (e as any).changedTouches?.[0]?.clientX || (info.point.x - window.scrollX);
                                       const y = (e as any).clientY || (e as any).changedTouches?.[0]?.clientY || (info.point.y - window.scrollY);
                                       
                                       const elements = document.elementsFromPoint(x, y);
-                                      // Find the first element that is or is inside a calendar cell
+                                      const cell = elements
+                                        .map(el => (el as HTMLElement).closest('.calendar-cell'))
+                                        .find(el => el !== null) as HTMLElement | undefined;
+                                      
+                                      if (cell) {
+                                        const dateStr = cell.getAttribute('data-date');
+                                        setDragOverDate(dateStr);
+                                      } else {
+                                        setDragOverDate(null);
+                                      }
+                                    }}
+                                    onDragEnd={(e, info) => {
+                                      if (!isAdmin) return;
+                                      setDragOverDate(null);
+                                      
+                                      const x = (e as any).clientX || (e as any).changedTouches?.[0]?.clientX || (info.point.x - window.scrollX);
+                                      const y = (e as any).clientY || (e as any).changedTouches?.[0]?.clientY || (info.point.y - window.scrollY);
+                                      
+                                      const elements = document.elementsFromPoint(x, y);
                                       const cell = elements
                                         .map(el => (el as HTMLElement).closest('.calendar-cell'))
                                         .find(el => el !== null) as HTMLElement | undefined;
@@ -985,11 +1006,8 @@ export default function App() {
                                         if (dateStr) {
                                           const targetDate = parseISO(dateStr);
                                           const isTargetPast = isBefore(targetDate, startOfDay(now));
-                                          
-                                          // 本日以降のすべての日程で移動とコピーが表示するように
                                           if (isTargetPast) return;
-
-                                          // Small delay to prevent accidental backdrop clicks or edit modal opening on mobile
+ 
                                           setTimeout(() => {
                                             setPendingDrop({ 
                                               shift, 
