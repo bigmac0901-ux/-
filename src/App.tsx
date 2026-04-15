@@ -122,6 +122,35 @@ function getHolidayName(date: Date): string | null {
 }
 
 // --- Types ---
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
 interface Staff {
   id: string;
   name: string;
@@ -148,29 +177,43 @@ interface Shift {
 
 const ErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [hasError, setHasError] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [errorInfo, setErrorInfo] = useState<string | null>(null);
 
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
       setHasError(true);
-      setErrorMsg(event.message);
+      setErrorInfo(event.error?.message || event.message);
     };
     window.addEventListener('error', handleError);
     return () => window.removeEventListener('error', handleError);
   }, []);
 
   if (hasError) {
+    let displayMessage = "申し訳ありません。エラーが発生しました。";
+    try {
+      if (errorInfo) {
+        const parsed = JSON.parse(errorInfo) as FirestoreErrorInfo;
+        if (parsed.error.includes('permission-denied') || parsed.error.includes('insufficient permissions')) {
+          displayMessage = "アクセス権限がありません。管理者としてログインしているか確認してください。";
+        } else {
+          displayMessage = parsed.error;
+        }
+      }
+    } catch (e) {
+      if (errorInfo) displayMessage = errorInfo;
+    }
+
     return (
-      <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
-        <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-2xl border border-red-100">
-          <div className="flex items-center gap-3 text-red-600 mb-4">
-            <AlertCircle className="w-8 h-8" />
-            <h1 className="text-xl font-bold">エラーが発生しました</h1>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-red-100">
+          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-8 h-8 text-red-500" />
           </div>
-          <p className="text-slate-600 mb-6">{errorMsg}</p>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">エラーが発生しました</h2>
+          <p className="text-slate-500 mb-8">{displayMessage}</p>
           <button 
             onClick={() => window.location.reload()}
-            className="w-full py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-colors"
+            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95"
           >
             再読み込み
           </button>
@@ -181,6 +224,29 @@ const ErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   return <>{children}</>;
 };
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -199,11 +265,12 @@ export default function App() {
   const [activeView, setActiveView] = useState<'calendar' | 'management'>('calendar');
   const now = new Date();
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
-  const [pendingDrop, setPendingDrop] = useState<{ shiftId: string; targetDate: Date; isCopy?: boolean } | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<{ shift: Shift; targetDate: Date; isCopy?: boolean } | null>(null);
   const [shiftToDelete, setShiftToDelete] = useState<Shift | null>(null);
   const [staffToDelete, setStaffToDelete] = useState<Staff | null>(null);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   // Auth Listener
   useEffect(() => {
@@ -213,15 +280,24 @@ export default function App() {
       
       if (currentUser) {
         const staffDocRef = doc(db, 'staff', currentUser.uid);
-        const staffDoc = await getDoc(staffDocRef);
-        if (!staffDoc.exists()) {
-          const isDefaultAdmin = currentUser.email && ADMIN_EMAILS.includes(currentUser.email);
-          await setDoc(staffDocRef, {
-            name: currentUser.displayName || '不明なユーザー',
-            email: currentUser.email,
-            role: isDefaultAdmin ? 'admin' : 'staff',
-            color: '#3b82f6'
-          });
+        const path = `staff/${currentUser.uid}`;
+        try {
+          const staffDoc = await getDoc(staffDocRef);
+          if (!staffDoc.exists()) {
+            const isDefaultAdmin = currentUser.email && ADMIN_EMAILS.includes(currentUser.email);
+            try {
+              await setDoc(staffDocRef, {
+                name: currentUser.displayName || '不明なユーザー',
+                email: currentUser.email,
+                role: isDefaultAdmin ? 'admin' : 'staff',
+                color: '#3b82f6'
+              });
+            } catch (error) {
+              handleFirestoreError(error, OperationType.WRITE, path);
+            }
+          }
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, path);
         }
       }
     });
@@ -234,7 +310,7 @@ export default function App() {
     const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
       const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
       setStaffList(list);
-    }, (error) => console.error("Staff fetch error:", error));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'staff'));
 
     const shiftsQuery = query(collection(db, 'shifts'), orderBy('startTime', 'asc'));
     const unsubscribeShifts = onSnapshot(shiftsQuery, (snapshot) => {
@@ -248,13 +324,13 @@ export default function App() {
         } as Shift;
       });
       setShifts(list);
-    }, (error) => console.error("Shifts fetch error:", error));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'shifts'));
 
     const externalEventsQuery = query(collection(db, 'external_events'), orderBy('date', 'asc'));
     const unsubscribeExternalEvents = onSnapshot(externalEventsQuery, (snapshot) => {
       const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalEvent));
       setExternalEvents(list);
-    }, (error) => console.error("External events fetch error:", error));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'external_events'));
 
     return () => {
       unsubscribeStaff();
@@ -299,18 +375,36 @@ export default function App() {
         }
 
         // 2. 既存のイベントをすべて削除（古いデータや名前が変わったデータの重複を防ぐため）
-        const existingEventsSnapshot = await getDocs(collection(db, 'external_events'));
-        const deletePromises = existingEventsSnapshot.docs.map(d => deleteDoc(d.ref));
+        const path = 'external_events';
+        let existingEventsSnapshot;
+        try {
+          existingEventsSnapshot = await getDocs(collection(db, path));
+        } catch (error) {
+          handleFirestoreError(error, OperationType.LIST, path);
+          return;
+        }
+
+        const deletePromises = existingEventsSnapshot.docs.map(async (d) => {
+          try {
+            await deleteDoc(d.ref);
+          } catch (error) {
+            handleFirestoreError(error, OperationType.DELETE, `${path}/${d.id}`);
+          }
+        });
         await Promise.all(deletePromises);
 
         // 3. 新しいイベントを保存
         let count = 0;
         for (const event of uniqueEvents) {
           const eventId = `${event.type}_${event.date}_${count}`;
-          await setDoc(doc(db, 'external_events', eventId), {
-            ...event,
-            updatedAt: Timestamp.now()
-          });
+          try {
+            await setDoc(doc(db, path, eventId), {
+              ...event,
+              updatedAt: Timestamp.now()
+            });
+          } catch (error) {
+            handleFirestoreError(error, OperationType.WRITE, `${path}/${eventId}`);
+          }
           count++;
         }
         setSyncMessage({ text: `${count}件のイベント情報を同期しました。`, type: 'success' });
@@ -374,61 +468,83 @@ export default function App() {
   }, [shifts]);
 
   const handleShiftAction = async (action: 'move' | 'copy') => {
-    if (!pendingDrop) return;
-    const { shiftId, targetDate } = pendingDrop;
-    const shift = shifts.find(s => s.id === shiftId);
-    if (!shift) return;
-
-    const duration = shift.endTime.getTime() - shift.startTime.getTime();
+    if (!pendingDrop || isProcessingAction) return;
+    setIsProcessingAction(true);
     
-    // Create new start time with the same hours/minutes but on the target date
-    const newStartTime = new Date(targetDate);
-    newStartTime.setHours(shift.startTime.getHours());
-    newStartTime.setMinutes(shift.startTime.getMinutes());
-    newStartTime.setSeconds(0);
-    newStartTime.setMilliseconds(0);
-
-    const newEndTime = new Date(newStartTime.getTime() + duration);
+    const { shift, targetDate } = pendingDrop;
+    console.log(`[handleShiftAction] Action: ${action}, ShiftID: ${shift.id}, TargetDate: ${format(targetDate, 'yyyy-MM-dd')}`);
 
     try {
+      const duration = shift.endTime.getTime() - shift.startTime.getTime();
+      
+      // Create new start time with the same hours/minutes but on the target date
+      const newStartTime = new Date(targetDate);
+      newStartTime.setHours(shift.startTime.getHours());
+      newStartTime.setMinutes(shift.startTime.getMinutes());
+      newStartTime.setSeconds(0);
+      newStartTime.setMilliseconds(0);
+
+      const newEndTime = new Date(newStartTime.getTime() + duration);
+
       if (action === 'move') {
-        await updateDoc(doc(db, 'shifts', shiftId), {
-          startTime: Timestamp.fromDate(newStartTime),
-          endTime: Timestamp.fromDate(newEndTime)
-        });
+        const path = `shifts/${shift.id}`;
+        console.log(`[handleShiftAction] Moving shift ${shift.id} to ${format(newStartTime, 'HH:mm')} - ${format(newEndTime, 'HH:mm')}`);
+        try {
+          await updateDoc(doc(db, 'shifts', shift.id), {
+            startTime: Timestamp.fromDate(newStartTime),
+            endTime: Timestamp.fromDate(newEndTime),
+            staffId: shift.staffId 
+          });
+          console.log("[handleShiftAction] Move successful");
+        } catch (error) {
+          handleFirestoreError(error, OperationType.UPDATE, path);
+        }
       } else {
-        await addDoc(collection(db, 'shifts'), {
-          staffId: shift.staffId,
-          staffName: shift.staffName,
-          startTime: Timestamp.fromDate(newStartTime),
-          endTime: Timestamp.fromDate(newEndTime),
-          title: shift.title || '',
-          note: shift.note || ''
-        });
+        const path = 'shifts';
+        console.log(`[handleShiftAction] Copying shift ${shift.id} to ${format(newStartTime, 'HH:mm')} - ${format(newEndTime, 'HH:mm')}`);
+        try {
+          await addDoc(collection(db, 'shifts'), {
+            staffId: shift.staffId,
+            staffName: shift.staffName,
+            startTime: Timestamp.fromDate(newStartTime),
+            endTime: Timestamp.fromDate(newEndTime),
+            title: shift.title || '',
+            note: shift.note || '',
+            event: shift.event || ''
+          });
+          console.log("[handleShiftAction] Copy successful");
+        } catch (error) {
+          handleFirestoreError(error, OperationType.CREATE, path);
+        }
       }
-      setPendingDrop(null);
     } catch (err) {
-      console.error(`Shift ${action} error:`, err);
+      console.error(`[handleShiftAction] Error:`, err);
+      throw err;
+    } finally {
+      setIsProcessingAction(false);
+      setPendingDrop(null);
     }
   };
 
   const handleDeleteShift = async () => {
     if (!shiftToDelete) return;
+    const path = `shifts/${shiftToDelete.id}`;
     try {
       await deleteDoc(doc(db, 'shifts', shiftToDelete.id));
       setShiftToDelete(null);
     } catch (err) {
-      console.error("Shift delete error:", err);
+      handleFirestoreError(err, OperationType.DELETE, path);
     }
   };
 
   const handleDeleteStaff = async () => {
     if (!staffToDelete) return;
+    const path = `staff/${staffToDelete.id}`;
     try {
       await deleteDoc(doc(db, 'staff', staffToDelete.id));
       setStaffToDelete(null);
     } catch (err) {
-      console.error("Staff delete error:", err);
+      handleFirestoreError(err, OperationType.DELETE, path);
     }
   };
 
@@ -456,7 +572,7 @@ export default function App() {
           <div className="flex items-center justify-between lg:justify-start gap-2 mb-6 shrink-0">
             <div className="flex items-center gap-2">
               <img 
-                src="/favicon.png" 
+                src="/alphalogo.jpg" 
                 alt="AIHS StaffShift" 
                 className="w-8 h-8 rounded-lg object-contain" 
                 referrerPolicy="no-referrer"
@@ -876,7 +992,7 @@ export default function App() {
                                           // Small delay to prevent accidental backdrop clicks or edit modal opening on mobile
                                           setTimeout(() => {
                                             setPendingDrop({ 
-                                              shiftId: shift.id, 
+                                              shift, 
                                               targetDate 
                                             });
                                           }, 100);
@@ -1241,10 +1357,15 @@ export default function App() {
                     };
 
                     try {
-                      if (editingShift) {
-                        await updateDoc(doc(db, 'shifts', editingShift.id), shiftData);
-                      } else {
-                        await addDoc(collection(db, 'shifts'), shiftData);
+                      const path = editingShift ? `shifts/${editingShift.id}` : 'shifts';
+                      try {
+                        if (editingShift) {
+                          await updateDoc(doc(db, 'shifts', editingShift.id), shiftData);
+                        } else {
+                          await addDoc(collection(db, 'shifts'), shiftData);
+                        }
+                      } catch (error) {
+                        handleFirestoreError(error, editingShift ? OperationType.UPDATE : OperationType.CREATE, path);
                       }
                       
                       // Bulk Copy Logic (if endDate is after startDate)
@@ -1257,11 +1378,16 @@ export default function App() {
                           const newStart = new Date(currentDate);
                           const newEnd = new Date(currentDate.getTime() + duration);
                           
-                          await addDoc(collection(db, 'shifts'), {
-                            ...shiftData,
-                            startTime: Timestamp.fromDate(newStart),
-                            endTime: Timestamp.fromDate(newEnd)
-                          });
+                          const bulkPath = 'shifts';
+                          try {
+                            await addDoc(collection(db, 'shifts'), {
+                              ...shiftData,
+                              startTime: Timestamp.fromDate(newStart),
+                              endTime: Timestamp.fromDate(newEnd)
+                            });
+                          } catch (error) {
+                            handleFirestoreError(error, OperationType.CREATE, bulkPath);
+                          }
                           currentDate = addDays(currentDate, 1);
                         }
                       }
@@ -1429,34 +1555,49 @@ export default function App() {
 
                     try {
                       if (editingStaff) {
-                        await updateDoc(doc(db, 'staff', editingStaff.id), {
-                          name,
-                          role,
-                          color,
-                          phone,
-                          email,
-                          updatedAt: Timestamp.now()
-                        });
+                        const path = `staff/${editingStaff.id}`;
+                        try {
+                          await updateDoc(doc(db, 'staff', editingStaff.id), {
+                            name,
+                            role,
+                            color,
+                            phone,
+                            email,
+                            updatedAt: Timestamp.now()
+                          });
+                        } catch (error) {
+                          handleFirestoreError(error, OperationType.UPDATE, path);
+                        }
 
                         // 名前が変更された場合、関連するシフトのスタッフ名も更新する
                         if (editingStaff.name !== name) {
                           const relatedShifts = shifts.filter(s => s.staffId === editingStaff.id);
                           for (const shift of relatedShifts) {
-                            await updateDoc(doc(db, 'shifts', shift.id), {
-                              staffName: name
-                            });
+                            const shiftPath = `shifts/${shift.id}`;
+                            try {
+                              await updateDoc(doc(db, 'shifts', shift.id), {
+                                staffName: name
+                              });
+                            } catch (error) {
+                              handleFirestoreError(error, OperationType.UPDATE, shiftPath);
+                            }
                           }
                         }
                       } else {
-                        await addDoc(collection(db, 'staff'), {
-                          name,
-                          role,
-                          color,
-                          phone,
-                          email,
-                          isManual: true,
-                          createdAt: Timestamp.now()
-                        });
+                        const path = 'staff';
+                        try {
+                          await addDoc(collection(db, 'staff'), {
+                            name,
+                            role,
+                            color,
+                            phone,
+                            email,
+                            isManual: true,
+                            createdAt: Timestamp.now()
+                          });
+                        } catch (error) {
+                          handleFirestoreError(error, OperationType.CREATE, path);
+                        }
                       }
                       setIsStaffModalOpen(false);
                       setEditingStaff(null);
@@ -1577,22 +1718,41 @@ export default function App() {
                 </p>
                 <div className="flex flex-col gap-3">
                   <button 
-                    onClick={() => handleShiftAction('move')}
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-100 flex items-center justify-center gap-2"
+                    onClick={() => {
+                      console.log("Move button clicked");
+                      handleShiftAction('move');
+                    }}
+                    disabled={isProcessingAction}
+                    className={cn(
+                      "w-full py-4 bg-blue-600 text-white rounded-2xl font-bold transition-all active:scale-95 shadow-lg shadow-blue-100 flex items-center justify-center gap-2",
+                      isProcessingAction ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700"
+                    )}
                   >
-                    <Move className="w-5 h-5" />
-                    移動する
+                    {isProcessingAction ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Move className="w-5 h-5" />
+                    )}
+                    {isProcessingAction ? '処理中...' : '移動する'}
                   </button>
                   <button 
-                    onClick={() => handleShiftAction('copy')}
-                    className="w-full py-4 bg-slate-100 text-slate-900 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    onClick={() => {
+                      console.log("Copy button clicked");
+                      handleShiftAction('copy');
+                    }}
+                    disabled={isProcessingAction}
+                    className={cn(
+                      "w-full py-4 bg-slate-100 text-slate-900 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2",
+                      isProcessingAction ? "opacity-50 cursor-not-allowed" : "hover:bg-slate-200"
+                    )}
                   >
                     <Copy className="w-5 h-5" />
                     コピーする
                   </button>
                   <button 
                     onClick={() => setPendingDrop(null)}
-                    className="w-full py-3 text-slate-400 font-medium hover:text-slate-600 transition-all"
+                    disabled={isProcessingAction}
+                    className="w-full py-3 text-slate-400 font-medium hover:text-slate-600 transition-all disabled:opacity-50"
                   >
                     キャンセル
                   </button>
