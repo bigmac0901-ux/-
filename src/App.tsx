@@ -572,12 +572,9 @@ export default function App() {
         )}>
           <div className="flex items-center justify-between lg:justify-start gap-2 mb-6 shrink-0">
             <div className="flex items-center gap-2">
-              <img 
-                src="/favicon.png" 
-                alt="AIHS StaffShift" 
-                className="w-8 h-8 rounded-lg object-contain" 
-                referrerPolicy="no-referrer"
-              />
+              <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+                <CalendarIcon className="w-5 h-5 text-white" />
+              </div>
               <h1 className="text-lg font-bold tracking-tight">AIHS StaffShift</h1>
             </div>
             <button 
@@ -967,15 +964,17 @@ export default function App() {
                                       scale: 1.02, 
                                       opacity: 0.85,
                                       boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
-                                      cursor: 'grabbing'
+                                      cursor: 'grabbing',
+                                      pointerEvents: 'none'
                                     }}
                                     onDragStart={() => {
                                       if (!isAdmin) return;
                                     }}
                                     onDrag={(e, info) => {
                                       if (!isAdmin) return;
-                                      const x = (e as any).clientX || (e as any).changedTouches?.[0]?.clientX || (info.point.x - window.scrollX);
-                                      const y = (e as any).clientY || (e as any).changedTouches?.[0]?.clientY || (info.point.y - window.scrollY);
+                                      // Use clientX/Y for viewport-relative coordinates
+                                      const x = (e as any).clientX || (e as any).touches?.[0]?.clientX || (e as any).changedTouches?.[0]?.clientX || info.point.x;
+                                      const y = (e as any).clientY || (e as any).touches?.[0]?.clientY || (e as any).changedTouches?.[0]?.clientY || info.point.y;
                                       
                                       const elements = document.elementsFromPoint(x, y);
                                       const cell = elements
@@ -993,8 +992,8 @@ export default function App() {
                                       if (!isAdmin) return;
                                       setDragOverDate(null);
                                       
-                                      const x = (e as any).clientX || (e as any).changedTouches?.[0]?.clientX || (info.point.x - window.scrollX);
-                                      const y = (e as any).clientY || (e as any).changedTouches?.[0]?.clientY || (info.point.y - window.scrollY);
+                                      const x = (e as any).clientX || (e as any).touches?.[0]?.clientX || (e as any).changedTouches?.[0]?.clientX || info.point.x;
+                                      const y = (e as any).clientY || (e as any).touches?.[0]?.clientY || (e as any).changedTouches?.[0]?.clientY || info.point.y;
                                       
                                       const elements = document.elementsFromPoint(x, y);
                                       const cell = elements
