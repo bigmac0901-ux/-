@@ -78,6 +78,7 @@ import { fetchSportsSchedules, type ExternalEvent } from './services/geminiServi
 const ADMIN_EMAILS = [
   "bigmac0901@gmail.com",
   "alphastaff5123@gmail.com",
+  "rappoppokazumi510@gmail.com",
   // ここに管理者にしたいメールアドレスを追加してください
 ];
 
