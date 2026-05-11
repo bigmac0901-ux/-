@@ -73,6 +73,7 @@ import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { fetchSportsSchedules, type ExternalEvent } from './services/geminiService';
+import { Analytics } from '@vercel/analytics/react';
 
 // --- Constants ---
 const ADMIN_EMAILS = [
@@ -1859,6 +1860,7 @@ export default function App() {
           )}
         </AnimatePresence>
       </div>
+      <Analytics />
     </ErrorBoundary>
   );
 }
