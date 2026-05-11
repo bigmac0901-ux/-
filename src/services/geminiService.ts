@@ -23,36 +23,37 @@ export async function fetchSportsSchedules(): Promise<ExternalEvent[]> {
     
     // ステップ1: Google検索を使用して最新のイベント情報をテキストで取得
     const searchResponse = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: `長崎県内の以下の施設の最新イベント日程（${currentYear}年〜${nextYear}年）を教えてください。
-1. V・ファーレン長崎のホームゲーム
-2. 長崎ヴェルカのホームゲーム
+1. V・ファーレン長崎のホームゲーム（Jリーグ）
+2. 長崎ヴェルカのホームゲーム（Bリーグ）
 3. 長崎ブリックホールのライブ・コンサート
 4. 長崎スタジアムシティで開催されるライブ・イベント
 
 ※注意：「THE CLUB NAGASAKI」のイベントは含めないでください。
 
-日付（YYYY-MM-DD）、イベント名、場所を含めてください。`,
+回答形式：各イベントの日付（YYYY-MM-DD）、イベント名、場所をリストアップしてください。`,
       config: {
-        tools: [{ googleSearch: {} }]
+        tools: [{ googleSearch: {} }],
       }
     });
 
     const rawText = searchResponse.text;
     if (!rawText) {
+      console.warn("No content returned from search model");
       return [];
     }
 
     // ステップ2: 取得したテキスト情報をJSON形式に整形
     const formatResponse = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: `以下のテキストからイベント日程を抽出し、JSON形式の配列で返してください。
 「THE CLUB NAGASAKI」に関連するイベントは除外してください。
 
 各要素は以下のプロパティを持ってください：
 - date: YYYY-MM-DD形式の日付
 - title: イベント名
-- type: 'v-varen', 'velca', 'live' のいずれか（スポーツ以外は 'live'）
+- type: 'v-varen', 'velca', 'live' のいずれか（V・ファーレンは 'v-varen'、ヴェルカは 'velca'、その他は 'live'）
 - location: 開催場所
 
 テキスト：
@@ -66,7 +67,7 @@ ${rawText}`,
             properties: {
               date: { type: Type.STRING },
               title: { type: Type.STRING },
-              type: { type: Type.STRING },
+              type: { type: Type.STRING, enum: ['v-varen', 'velca', 'live'] },
               location: { type: Type.STRING }
             },
             required: ["date", "title", "type"]
@@ -90,6 +91,12 @@ ${rawText}`,
     });
   } catch (error: any) {
     console.error("Detailed Error fetching sports schedules:", error);
+    
+    // 429エラー（レート制限）のハンドリング
+    if (error.message?.includes('429') || (error.status && error.status === 429)) {
+      throw new Error("AIの利用制限に達しました。リクエストが多すぎるため、数分待ってから再度お試しください。");
+    }
+    
     throw new Error(error.message || "同期中にエラーが発生しました。");
   }
 }
