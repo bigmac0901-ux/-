@@ -892,21 +892,24 @@ export default function App() {
                                 </div>
                                 {/* イベントアイコンの表示 */}
                                 <div className="flex items-center gap-0.5">
-                                  {externalEvents
-                                    .filter(e => e.date === dayKey)
-                                    .map(event => {
-                                      const isPastDay = isBefore(day, startOfDay(now));
-                                      return (
-                                        <div key={event.id} title={event.title} className={cn(isPastDay && "opacity-30")}>
-                                          {event.type === 'live' ? (
-                                            <Music className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-600" />
-                                          ) : (
-                                            <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-600" />
-                                          )}
-                                        </div>
-                                      );
-                                    })
-                                  }
+                                  {(() => {
+                                    const dayEvents = externalEvents.filter(e => e.date === dayKey);
+                                    if (dayEvents.length === 0) return null;
+                                    
+                                    const isPastDay = isBefore(day, startOfDay(now));
+                                    const hasSports = dayEvents.some(e => e.type === 'v-varen' || e.type === 'velca');
+                                    const titleTip = dayEvents.map(e => e.title).join(', ');
+                                    
+                                    return (
+                                      <div title={titleTip} className={cn(isPastDay && "opacity-30")}>
+                                        {hasSports ? (
+                                          <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-600" />
+                                        ) : (
+                                          <Music className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-600" />
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                               {isAdmin && (
