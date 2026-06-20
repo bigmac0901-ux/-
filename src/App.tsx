@@ -350,8 +350,21 @@ export default function App() {
       if (events.length > 0) {
         // 1. 取得したデータの重複排除
         const uniqueEvents: ExternalEvent[] = [];
-        const seenKeys = new Set<string>();
-        
+        const seenEventsInDay: Record<string, { type: string; cleanTitle: string; title: string }[]> = {};
+
+        // 表記ゆれを統一するための簡易クレンジング関数
+        const cleanTitle = (titleStr: string): string => {
+          return titleStr
+            .toLowerCase()
+            .replace(/[\s\t　]/g, '') // 空白除去
+            .replace(/[【】\[\]\(\)（）「」『』]/g, '') // カッコ除去
+            .replace(/vs|対戦|対/g, 'v') // 試合表記の統一
+            .replace(/jリーグ|j1|j2|j3|bリーグ|b1|b2|b3/g, '') // リーグ名除去
+            .replace(/のホームゲーム|ホームゲーム/g, '') // 不要語の除去
+            .replace(/・/g, '') // 中黒除去
+            .trim();
+        };
+
         for (const event of events) {
           // 日付の形式を正規化 (YYYY-MM-DD)
           let normalizedDate = event.date.replace(/\//g, '-');
@@ -364,14 +377,48 @@ export default function App() {
           }
 
           if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) continue;
+
+          const currentCleanTitle = cleanTitle(event.title);
           
-          // スポーツは同日1試合、ライブはタイトルで重複判定
-          const dedupeKey = event.type === 'live' 
-            ? `${event.type}_${normalizedDate}_${event.title.substring(0, 10)}`
-            : `${event.type}_${normalizedDate}`;
-            
-          if (!seenKeys.has(dedupeKey)) {
-            seenKeys.add(dedupeKey);
+          if (!seenEventsInDay[normalizedDate]) {
+            seenEventsInDay[normalizedDate] = [];
+          }
+
+          // 同一日の重複をチェック
+          let isDuplicate = false;
+          
+          for (const existing of seenEventsInDay[normalizedDate]) {
+            // 1. 同一日で同じタイプ、かつクレンジング後のタイトルが完全に一致、または部分一致
+            if (existing.type === event.type) {
+              if (existing.cleanTitle === currentCleanTitle ||
+                  existing.cleanTitle.includes(currentCleanTitle) ||
+                  currentCleanTitle.includes(existing.cleanTitle)) {
+                isDuplicate = true;
+                break;
+              }
+              // スポーツ（v-varen、velca）の場合、同じ日付に同じタイプの試合は最大1つにする
+              if (event.type === 'v-varen' || event.type === 'velca') {
+                isDuplicate = true;
+                break;
+              }
+            } else {
+              // 異なるタイプであっても、クレンジング後のタイトルがほぼ同じか部分一致すれば重複とみなす
+              // (例: Geminiがスポーツの試合を誤って live として2重抽出した場合など)
+              if (existing.cleanTitle === currentCleanTitle ||
+                  existing.cleanTitle.includes(currentCleanTitle) ||
+                  currentCleanTitle.includes(existing.cleanTitle)) {
+                isDuplicate = true;
+                break;
+              }
+            }
+          }
+
+          if (!isDuplicate) {
+            seenEventsInDay[normalizedDate].push({
+              type: event.type,
+              cleanTitle: currentCleanTitle,
+              title: event.title
+            });
             uniqueEvents.push({ ...event, date: normalizedDate });
           }
         }
