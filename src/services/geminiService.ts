@@ -25,7 +25,7 @@ export async function fetchSportsSchedules(): Promise<ExternalEvent[]> {
     
     // ステップ1: Google検索を使用して最新のイベント情報をテキストで取得
     const searchResponse = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: `長崎県内の以下の施設の最新イベント日程（${currentYear}年${currentMonth}月〜${nextYear}年末）を教えてください。
 1. V・ファーレン長崎のホームゲーム（Jリーグ、ピーススタジアム）
 2. 長崎ヴェルカのホームゲーム（Bリーグ、ハピネスアリーナ）
@@ -50,12 +50,17 @@ export async function fetchSportsSchedules(): Promise<ExternalEvent[]> {
 
     // ステップ2: 取得したテキスト情報をJSON形式に整形
     const formatResponse = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: `以下のテキストから「日付」「イベント名」「場所」を抽出し、指定されたJSON形式の配列で返してください。
 「THE CLUB NAGASAKI」に関連するイベントは必ず除外してください。
 
+※重要：
+1. 「date」は必ず [YYYY-MM-DD] 形式（例：2026-06-15）で格納してください。
+2. もし日付が特定できない、または不明なイベントは、JSON配列に含めず必ず除外してください。
+3. すべての格納するオブジェクトには「date」プロパティを正確に入力してください。
+
 各要素は以下のプロパティを持ってください：
-- date: YYYY-MM-DD形式の日付（不明な場合は含めない）
+- date: YYYY-MM-DD形式の日付（必ず指定。不明な場合は含めない、つまりその要素自体を除外する）
 - title: イベント名
 - type: 'v-varen', 'velca', 'live' のいずれか（V・ファーレンは 'v-varen'、ヴェルカは 'velca'、その他は 'live'）
 - location: 開催場所
